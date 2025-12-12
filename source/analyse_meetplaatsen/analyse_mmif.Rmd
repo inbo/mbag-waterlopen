@@ -1,0 +1,560 @@
+---
+title: "Verkennende analyse gegevens 2025"
+author: "Hans Van Calster"
+date: "2025-12-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(sf)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(INBOtheme)
+library(brms)
+source(here::here("source", "R", "geocomputations.R"))
+conflicted::conflicts_prefer(dplyr::filter)
+conflicted::conflicts_prefer(brms::ar)
+```
+
+```{r inlezen}
+meetplaatsen <- readr::read_csv2(here::here(
+  "data",
+  "vmm",
+  "selectie_meetplaatsen_mbag_macroinvertebraten.csv"
+))
+mmif <- readxl::read_excel(
+  path = here::here(
+    "data",
+    "vmm",
+    "data_2025",
+    "Beoordeling MMIF per sample point MBAG.xlsx"
+  ),
+  sheet = "MMIF"
+) |>
+  janitor::clean_names()
+chem_res <- readxl::read_excel(
+  path = here::here(
+    "data", "vmm", "data_2025",
+    "Analyseresultaten per meetplaats MBAG.xlsx"
+  ),
+  sheet = "Resultaten"
+) |> janitor::clean_names()
+
+chem_par <- readxl::read_excel(
+  path = here::here(
+    "data", "vmm", "data_2025",
+    "Analyseresultaten per meetplaats MBAG.xlsx"
+  ),
+  sheet = "Parameters"
+) |> janitor::clean_names()
+
+chem_loc <- readxl::read_excel(
+  path = here::here(
+    "data", "vmm", "data_2025",
+    "Analyseresultaten per meetplaats MBAG.xlsx"
+  ),
+  sheet = "SamplePoints"
+) |> janitor::clean_names()
+
+watersheds <- read_sf(
+  here::here(
+    "data", "vmm",
+    "selectie_watersheds_mbag_macroinvertebraten.gpkg"
+  )
+)
+```
+
+
+```{r landbouwgebruikspercelen-2024}
+lbg_2024 <- read_sf(
+  here::here(
+    "data", "landbouwgebruikspercelen",
+    "lbg_2024.gpkg"
+  )
+)
+
+lbg_2024 <- lbg_2024 |>
+  st_intersection(watersheds)
+lbg_2024 <- lbg_2024 |>
+  st_cast("GEOMETRYCOLLECTION") |>
+  st_collection_extract("POLYGON")
+
+watersheds_gewasgroep_2024 <- landusemetrics_grid_cell(
+  grid_cell = watersheds |>
+    rename(geometry = geom) |>
+    st_transform(31370),
+  layer = lbg_2024 %>%
+    select(GWSGRPH_LB, geom)  |>
+    rename(geometry = geom) |>
+    st_transform(31370),
+  grid_group_by_col = "meetplaats",
+  layer_group_by_col = "GWSGRPH_LB"
+)
+
+watersheds_aandeel_landbouw <- watersheds_gewasgroep_2024  |>
+  group_by(meetplaats) |>
+  summarise(
+    area_prop = sum(area_prop),
+    area_ha = sum(area_m2) / 1e4
+  )
+
+ws_aandeel_lb_intensief <- watersheds_gewasgroep_2024 %>%
+  filter(GWSGRPH_LB %in% c(
+    "Aardappelen",
+    "Maïs",
+    "Groenten, kruiden en sierplanten",
+    "Voedergewassen"
+  )) %>%
+  group_by(meetplaats) %>%
+  summarise(
+    area_prop = sum(area_prop),
+    area_ha = sum(area_m2) / 1e4
+  )
+
+aandelen_2024 <- ws_aandeel_lb_intensief |>
+  select(meetplaats, aandeel_intensief = area_prop) |>
+  left_join(
+    watersheds_aandeel_landbouw |>
+      select(meetplaats, aandeel_landbouw = area_prop)
+  )
+
+watersheds <- watersheds |>
+  select(rowname, meetplaats, opp_ha, overlap_vlndrn, fgroup, geom) |>
+  left_join(
+    aandelen_2024
+  )
+
+```
+
+
+
+```{r}
+meetplaatsen <- meetplaatsen |>
+  mutate(
+    sample_point = paste0("OW", meetplaats)
+  ) |>
+  inner_join(chem_loc)
+
+all(abs(meetplaatsen$lambert_x - meetplaatsen$X) < 0.01)
+all(abs(meetplaatsen$lambert_y - meetplaatsen$Y) < 0.01)
+```
+
+
+# Verkenning
+
+Maandelijkse metingen waterstalen.
+
+```{r}
+chem_res |>
+  group_by(parameter_symbool, parameter_omschrijving) |> 
+  summarise(
+    aantal_metingen = n(),
+    aantal_locaties = n_distinct(sample_point),
+    aantal_tijdstippen = n_distinct(sample_datum_monstername)
+  ) |>
+  arrange(-aantal_metingen)
+```
+
+```{r}
+chem_res |>
+  mutate(
+    jaar = lubridate::year(sample_datum_monstername),
+    maand = lubridate::month(sample_datum_monstername)
+  ) |>
+  group_by(jaar, maand) |>
+  summarise(
+    aantal_locaties = n_distinct(sample_point),
+    aantal_meetvariabelen = n_distinct(parameter_omschrijving),
+    aantal_metingen = n()
+  ) |>
+  mutate(
+    periode = case_when(
+      maand %in% 1:2 ~ sprintf("Winterhalfjaar %s", jaar - 1),
+      maand == 12 ~ sprintf("Winterhalfjaar %s", jaar),
+      maand %in% 4:9 ~ sprintf("Zomerhalfjaar %s", jaar),
+      TRUE ~ NA
+    )
+  ) |>
+  relocate(periode)
+```
+
+
+```{r}
+tijdreeksen <- chem_res |>
+  inner_join(meetplaatsen) |>
+  group_by(parameter_omschrijving, eenheid) |>
+  nest() |>
+  mutate(
+    parameter_label = sprintf("%s [%s]", parameter_omschrijving, eenheid)
+  ) |>
+  filter(
+    grepl("nitr|fosf|Geleid", parameter_label)
+  ) |>
+  mutate(
+    plot = map2(
+      data,
+      parameter_label,
+      \(x, y) {
+        ggplot(x) +
+          geom_point(
+            aes(
+              x = sample_datum_monstername, y = resultaat,
+              colour = fgroup, shape = teken
+            ), alpha = 0.9, size = 3
+          ) +
+          geom_line(
+            aes(
+              x = sample_datum_monstername, y = resultaat, group = sample_point,
+              colour = fgroup
+            ), alpha = 0.3
+          ) +
+          geom_smooth(
+            aes(
+              x = sample_datum_monstername, y = resultaat,
+              colour = fgroup, fill = fgroup
+            ), alpha = 0.3
+          ) +
+          scale_y_log10() +
+          labs(title = y) +
+          scale_shape_manual(values = c("<" = "<", "=" = "="))
+      }
+    )
+  )
+
+tijdreeksen$plot
+```
+
+Aggregatie naar 1 waarde per meetplaats per jaar.
+
+Als doelstelling hanteert VMM vanaf MAP 6 (2019-2022) de gemiddelde nitraatconcentratie per afstroomzone op basis van de wintergegevens:
+
+Lange termijn doelstelling per afstroomzone is een streefwaarde van 18 mg nitraat per liter.
+
+Daarnaast wordt een verbetering met 4 mg nitraat/l vooropgesteld voor de afstroomzones die in de periode 2015-2018 een gemiddelde nitraatconcentratie van meer dan 18 mg nitraat/l hadden.
+
+
+Zomerhalfjaar voor een bepaald jaar wordt gedefinieerd als metingen in maanden 4 (april) t.e.m. 9 (september) van dat jaar.
+Winterhalfjaar voor een bepaald jaar wordt gedefinieerd als de laatste maand van dat jaar (december) en de twee eerste maanden van het daaropvolgende jaar (januari en februari).
+
+
+```{r}
+chem_subset_nn <- chem_res |>
+  inner_join(meetplaatsen, by = join_by(sample_point)) |>
+  select(
+    sample_point,
+    bekken,
+    waterloop,
+    fgroup,
+    lambert_x, lambert_y,
+    sample_datum_monstername,
+    starts_with("parameter"), eenheid,
+    teken,
+    resultaat
+  ) |>
+  mutate(
+    jaar = lubridate::year(sample_datum_monstername),
+    maand = lubridate::month(sample_datum_monstername)
+  ) |>
+  select(-sample_datum_monstername) |>
+  complete(
+    nesting(
+      sample_point, bekken, waterloop, fgroup, lambert_x, lambert_y, jaar, maand
+    ),
+    nesting(
+      parameter_omschrijving, parameter_symbool, eenheid
+    )
+  ) |>
+  filter(parameter_symbool == "N+N") 
+
+chem_jaar_nn <- chem_subset_nn |>
+  mutate(
+    periode = case_when(
+      maand %in% 1:2 ~ sprintf("Winterhalfjaar %s", jaar - 1),
+      maand == 12 ~ sprintf("Winterhalfjaar %s", jaar),
+      maand %in% 4:9 ~ sprintf("Zomerhalfjaar %s", jaar),
+      TRUE ~ NA
+    ),
+    periode_ = ifelse(grepl("Winter", periode), "Winterhalfjaar\n(benadering 1,2 en 12 2024)", periode)
+  ) |>
+  filter(!is.na(periode)) |>
+  group_by(
+    sample_point, fgroup, periode_, parameter_omschrijving, parameter_symbool,
+    eenheid
+  ) |>
+  summarise(
+    resultaat = exp(mean(log(resultaat), na.rm = TRUE)),
+    .groups = "drop"
+  )
+```
+
+```{r}
+chem_jaar_nn |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = fgroup,
+      y = resultaat,
+      colour = periode_
+    ),
+    position = position_dodge(width = 0.5),
+    alpha = 0.3
+  ) +
+  stat_summary(
+    aes(
+      x = fgroup,
+      y = resultaat,
+      colour = periode_
+    ),
+    position = position_dodge(width = 0.5),
+    fun.data = mean_cl_boot
+  ) +
+  facet_wrap(~ sprintf("%s [%s]", parameter_omschrijving, eenheid))
+```
+
+
+```{r}
+mmif_colours <- c(
+  Goed = "darkgreen",
+  Matig = "orange",
+  Ontoereikend = "darkred"
+)
+
+mmif |>
+  inner_join(meetplaatsen, by = join_by(sample_point, wl_code)) |>
+  rename(
+    mmif_label = klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
+  ) |> 
+  ggplot() +
+  stat_sum(
+    aes(
+      x = fgroup,
+      y = bio_index_waarde,
+      colour = mmif_label
+    )
+  ) +
+  stat_summary(
+    aes(
+      x = fgroup,
+      y = bio_index_waarde
+    ),
+    fun.data = mean_cl_boot
+  ) +
+  scale_colour_manual(values = mmif_colours)
+```
+
+
+```{r}
+mmif_nn <- mmif |>
+  left_join(
+    chem_jaar_nn |>
+      filter(
+        grepl("Winter", periode_)
+      ),
+    by = join_by(sample_point)
+  ) |>
+  mutate(
+    jaar_mi = lubridate::year(hoofd_sample_sample_datum_monstername),
+    maand_mi = lubridate::month(hoofd_sample_sample_datum_monstername)
+  ) |> 
+  rename(
+    mmif_label = klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
+  )
+
+mmif_nn <- mmif_nn |>
+  left_join(
+    watersheds |>
+      mutate(sample_point = paste0("OW", meetplaats)) |>
+      select(-fgroup),
+    by = join_by(sample_point)
+  ) 
+```
+
+```{r}
+mmif_nn |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = resultaat,
+      y = bio_index_waarde,
+      colour = fgroup
+    )
+  ) +
+  geom_smooth(
+    aes(
+      x = resultaat,
+      y = bio_index_waarde,
+      colour = fgroup,
+      fill = fgroup
+    ),
+    alpha = 0.3,
+    method = "lm"
+  ) +
+  labs(x = mmif_nn$parameter_omschrijving[1])
+```
+
+```{r}
+mmif_nn |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = hoofd_sample_sample_datum_monstername,
+      y = bio_index_waarde,
+      colour = fgroup
+    )
+  ) +
+  geom_smooth(
+    aes(
+      x = hoofd_sample_sample_datum_monstername,
+      y = bio_index_waarde,
+      colour = fgroup,
+      fill = fgroup
+    ),
+    alpha = 0.3,
+    method = "lm"
+  )
+
+```
+
+
+```{r}
+mmif_nn |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = aandeel_intensief,
+      y = bio_index_waarde,
+      colour = fgroup
+    )
+  ) +
+  geom_smooth(
+    aes(
+      x = aandeel_intensief,
+      y = bio_index_waarde,
+      colour = fgroup,
+      fill = fgroup
+    ),
+    alpha = 0.3,
+    method = "lm"
+  ) +
+  labs(x = "Aandeel intensieve landbouw")
+```
+
+```{r}
+mmif_nn |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = aandeel_intensief,
+      y = resultaat,
+      colour = fgroup
+    )
+  ) +
+  geom_smooth(
+    aes(
+      x = aandeel_intensief,
+      y = resultaat,
+      colour = fgroup,
+      fill = fgroup
+    ),
+    alpha = 0.3,
+    method = "lm"
+  )
+```
+
+# Modellering
+
+```{r}
+fs::dir_create(here::here("source", "brms_model"))
+fs::file_create(here::here("source", "brms_model", ".gitignore"))
+writeLines(
+  c("*", "!.gitignore"),
+  here::here("source", "brms_model", ".gitignore"),
+)
+m_mmif <- brm(
+  bf(
+    bio_index_waarde | mi() ~ 
+      aandeel_intensief +
+      fgroup +
+      mi(resultaat) +
+      aandeel_intensief:fgroup,
+    family = "beta",
+    decomp = "QR"
+  ) +
+    bf(
+      resultaat | mi() + trunc(lb = 0) ~ 
+        aandeel_intensief +
+        fgroup +
+        aandeel_intensief:fgroup
+    ) +
+    set_rescor(FALSE),
+  data = mmif_nn,
+  family = gaussian(),
+  prior = prior(normal(0, 1), class = "b"),
+  cores = 4,
+  file = here::here("source", "brms_model", "m_mmif"),
+  file_refit = "on_change",
+  backend = "cmdstanr"
+)
+```
+
+```{r}
+pdfun <- function(x, nsamp = 4000) {
+  pmax(sum(x > 0) / nsamp, sum(x < 0) / nsamp)
+}
+
+
+posterior::summarise_draws(
+  m_mmif,
+  posterior::default_summary_measures(),
+  pd = pdfun
+) |>
+  mutate(
+    pval = 2 * (1 - pd)
+  ) |> 
+  filter(grepl("(b_|bsp_)bio", variable)) |>
+  mutate(
+    variable = gsub("(^b_|^bsp_)bioindexwaarde_", "", variable),
+    variable = gsub("miresultaat", "nitraat+nitriet", variable),
+    variable = gsub("fgroup\\.+", "Maïs dominant", variable),
+  )
+```
+
+
+```{r}
+posterior::summarise_draws(
+  m_mmif,
+  posterior::default_summary_measures(),
+  pd = pdfun
+) |>
+  mutate(
+    pval = 2 * (1 - pd)
+  ) |> 
+  filter(grepl("(b_|bsp_)resu", variable)) |>
+  mutate(
+    variable = gsub("(^b_|^bsp_)resultaat_", "", variable),
+    variable = gsub("fgroup\\.+", "Maïs dominant", variable),
+  )
+
+```
+
+
+```{r}
+conditional_effects(
+  m_mmif,
+  "aandeel_intensief:fgroup",
+  resp = "bioindexwaarde"
+)
+```
+
+```{r}
+conditional_effects(
+  m_mmif,
+  "aandeel_intensief:fgroup",
+  resp = "resultaat"
+)
+```
+
