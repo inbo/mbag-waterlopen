@@ -670,9 +670,9 @@ Zoals eerder aangegeven, zijn er vier locaties met ontbrekende waarden voor de b
 We fitten een model voor de effecten van het type afstroomgebied en het aandeel intensieve landbouw op enerzijds de biotische index (Beta verdeling en logistische link functie) en anderzijds de 'winterhalfjaar' nitraatconcentratie (Normale verdeling met afknotting van waarden onder nul).
 Het model waarbij biotische index de responsvariabele is, bevat eveneens een term om na te gaan of er een effect is van de nitraatconcentratie.
 
-Voor de biotische index vinden we geen significante effecten (zie @tbl-params-mmif en @fig-ce-mmif-aandeel-intensief).
+Voor de biotische index vinden we geen significante effecten (zie @tbl-params-mediation en @fig-ce-mmif-aandeel-intensief).
 
-Voor de nitraatconcentratie vinden we een zwak effect (p < 0.1) dat wijst op verhoogde winterhalfjaar nitraatconcentraties bij hoger aandeel intensieve landbouw (zie @tbl-params-nitraat en @fig-ce-nitraat-aandeel-intensief).
+Voor de nitraatconcentratie vinden we een zwak effect (p < 0.1) dat wijst op verhoogde winterhalfjaar nitraatconcentraties bij hoger aandeel intensieve landbouw (zie @tbl-params-mediation en @fig-ce-nitraat-aandeel-intensief).
 
 ```{r}
 #| label: brms-model
@@ -689,7 +689,8 @@ m_mmif <- brm(
       aandeel_intensief +
       fgroup +
       resultaat +
-      aandeel_intensief:fgroup,
+      aandeel_intensief:fgroup +
+      resultaat:fgroup,
     family = "beta",
     decomp = "QR"
   ) +
@@ -704,6 +705,7 @@ m_mmif <- brm(
   family = gaussian(),
   prior = prior(normal(0, 1), class = "b"),
   cores = 4,
+  sample_prior = TRUE,
   file = here::here("source", "brms_model", "m_mmif"),
   file_refit = "on_change",
   backend = "cmdstanr"
@@ -712,30 +714,90 @@ m_mmif <- brm(
 
 
 
+
 ```{r}
-#| label: tbl-params-mmif
-#| tbl-cap: "Modelparameters voor biotische index"
+#| label: tbl-params-mediation
+#| tbl-cap: "Directe, indirecte en totale effecten van aandeel intensieve landbouw"
 
 pdfun <- function(x, nsamp = 4000) {
   pmax(sum(x > 0) / nsamp, sum(x < 0) / nsamp)
 }
 
-posterior::summarise_draws(
+# 1. Define the coefficient names to make the formulas readable
+# Path a: aandeel -> resultaat
+a_ref  <- "resultaat_aandeel_intensief"
+a_diff <- "resultaat_aandeel_intensief:fgroupMaïsdominant"
+
+# Path b: resultaat -> bio_index
+b_ref <- "bioindexwaarde_resultaat"
+b_diff <- "bioindexwaarde_fgroupMaïsdominant:resultaat"
+
+# Path c' (Direct): aandeel -> bio_index
+c_ref  <- "bioindexwaarde_aandeel_intensief"
+c_diff <- "bioindexwaarde_aandeel_intensief:fgroupMaïsdominant"
+
+# 2. Run the hypotheses
+# We calculate the Indirect effect (a*b) and Total effect (c + a*b)
+med_tests <- hypothesis(
   m_mmif,
-  posterior::default_summary_measures(),
-  pd = pdfun
-) |>
-  mutate(
-    pval = 2 * (1 - pd)
-  ) |> 
-  filter(grepl("(b_|bsp_)bio", variable)) |>
-  mutate(
-    variable = gsub("(^b_|^bsp_)bioindexwaarde_", "", variable),
-    variable = gsub("resultaat", "nitraat", variable),
-    variable = gsub("^fgroup\\.+", "Maïs dominant", variable),
+  c(
+    # --- Reference Group ---
+    "nitraat_direct_effect_aandeelintensief_graan" = paste0(a_ref, " = 0"),
+    "mmif_direct_effect_aandeelintensief_graan" = paste0(c_ref, " = 0"),
+    "mmif_indirect_effect_aandeelintensief_graan" =
+      paste0(a_ref, " * ", b_ref, " = 0"),
+    "mmif_total_effect_aandeelintensief_graan" = paste0(
+      c_ref, " + (", a_ref, " * ", b_ref, ") = 0"
+    ),
+    
+    # --- Maïsdominant Group (must add interaction terms) ---
+    "nitraat_direct_effect_aandeelintensief_mais" =
+      paste0("( ", a_ref, " + ", a_diff, ") = 0"),
+    "mmif_direct_effect_aandeelintensief_mais" =
+      paste0(c_ref, " + ", c_diff, " = 0"),
+    "mmif_indirect_effect_aandeelintensief_mais" = paste0(
+      "(", a_ref, " + ", a_diff, ") * (", b_ref, " + ", b_diff, ") = 0"),
+    "mmif_total_effect_aandeelintensief_mais" = paste0(
+      "(", c_ref, " + ", c_diff, ") + ((", a_ref, " + ", a_diff, ") * (",
+      b_ref, " + ", b_diff, ")) = 0"
+    )
+  ),
+  robust = TRUE
+)
+
+# 3. View results
+eoi <- med_tests$hypothesis |>
+  select(-Evid.Ratio, -Post.Prob, -Star) |> 
+  bind_cols(
+    med_tests$samples |>
+      pivot_longer(
+        everything()
+      ) |>
+      group_by(
+        name
+      ) |>
+      summarise(
+        pd = pdfun(value),
+        pval = 2 * (1 - pd)
+      ) |>
+      select(-name)
   ) |>
-  kable(digits = 2)
+  separate_wider_regex(
+    cols = Hypothesis,
+    patterns = c(
+      responsvariabele = ".*?",
+      "_",
+      type = ".*_effect",
+      "_",
+      effect = ".*?",
+      "_",
+      groep = ".*"
+    )
+  )
+eoi |>
+  kable(digits = 3)
 ```
+
 
 ```{r}
 #| label: fig-ce-mmif-aandeel-intensief
@@ -781,25 +843,6 @@ q <- q[[1]] +
 p + q + plot_layout(guides = "collect", axes = "collect")
 ```
 
-```{r}
-#| label: tbl-params-nitraat
-#| tbl-cap: "Modelparameters voor nitraatconcentratie"
-
-posterior::summarise_draws(
-  m_mmif,
-  posterior::default_summary_measures(),
-  pd = pdfun
-) |>
-  mutate(
-    pval = 2 * (1 - pd)
-  ) |> 
-  filter(grepl("(b_|bsp_)resu", variable)) |>
-  mutate(
-    variable = gsub("(^b_|^bsp_)resultaat_", "", variable),
-    variable = gsub("fgroup\\.+", "Maïs dominant", variable),
-  ) |>
-  kable(digits = 2)
-```
 
 ```{r}
 #| label: fig-ce-nitraat-aandeel-intensief
