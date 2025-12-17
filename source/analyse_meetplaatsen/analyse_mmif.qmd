@@ -109,6 +109,58 @@ meetplaatsen$fgroup <- factor(
 )
 ```
 
+
+```{r}
+#| label: water-bufferstroken
+
+# alle oppervlaktewaterlichamen
+water_1m <- read_sf(
+  here::here(
+    "data", "waterlagen",
+    "water_1m_fytovrij_1m_teelt_en_5_of_10m_mestvrij_2025_2025-02-19.gpkg"
+  )
+)
+# alle VHA waterlopen
+water_3m <- read_sf(
+ here::here(
+    "data", "waterlagen",
+    "water_3m_fytovrij_1m_teelt_en_5_of_10m_mestvrij_2025_2025-02-19.gpkg"
+ )
+)
+
+identical(names(water_1m), names(water_3m))
+water <- water_1m |>
+  mutate(source = "oppervlaktewaterlichamen") |>
+  bind_rows(
+    water_3m |>
+      mutate(source = "VHA waterlopen")
+  )
+rm(water_1m, water_3m)
+gc()
+
+watersheds_bufferstroken <- landusemetrics_grid_cell(
+  grid_cell = watersheds |>
+    rename(geometry = geom) |>
+    st_transform(31370),
+  layer = water %>%
+    select(source, geom)  |>
+    rename(geometry = geom) |>
+    st_transform(31370),
+  grid_group_by_col = "meetplaats",
+  layer_group_by_col = "source"
+)
+
+aandelen_buffers <- watersheds_bufferstroken |>
+  pivot_wider(
+    id_cols = meetplaats,
+    names_from = source,
+    values_from = area_prop,
+    names_prefix = "aandeel_",
+    values_fill = 0
+  ) |>
+  janitor::clean_names()
+```
+
 ```{r}
 #| label: landbouwgebruikspercelen-2024
 
@@ -176,12 +228,22 @@ aandelen_2024 <- ws_aandeel_lb_intensief |>
       select(meetplaats, aandeel_grasland = area_prop)
   )
 
+```
+
+
+```{r}
+#| label: watersheds-aandelen
+
 watersheds <- watersheds |>
   select(rowname, meetplaats, opp_ha, overlap_vlndrn, fgroup, geom) |>
   left_join(
-    aandelen_2024
+    aandelen_2024, by = join_by(meetplaats)
+  ) |> 
+  left_join(
+    aandelen_buffers, by = join_by(meetplaats)
   )
 ```
+
 
 ```{r}
 #| label: join-meetplaatsen
@@ -260,6 +322,17 @@ watersheds |>
     aandeel_grasland = sprintf(
       "%0.2f [%0.2f - %0.2f]",
       mean(aandeel_grasland), min(aandeel_grasland), max(aandeel_grasland)
+    ),
+    aandeel_buffer_vha = sprintf(
+      "%0.2f [%0.2f - %0.2f]",
+      mean(aandeel_vha_waterlopen), min(aandeel_vha_waterlopen),
+      max(aandeel_vha_waterlopen)
+    ),
+    aandeel_buffer_oppwater = sprintf(
+      "%0.2f [%0.2f - %0.2f]",
+      mean(aandeel_oppervlaktewaterlichamen),
+      min(aandeel_oppervlaktewaterlichamen),
+      max(aandeel_oppervlaktewaterlichamen)
     )
   ) |>
   kable(digits = 2)
@@ -471,7 +544,7 @@ chem_jaar_nn |>
 ```{r}
 #| label: fig-nitraat-aandeel-intensief
 #| fig-cap: "Relatie tussen aandeel intensieve landbouw en nitraatconcentratie"
-#| fig-width: 10.24
+#| fig-width: 10
 
 chem_jaar_nn |>
   left_join(
@@ -669,10 +742,23 @@ Zoals eerder aangegeven, zijn er vier locaties met ontbrekende waarden voor de b
 
 We fitten een model voor de effecten van het type afstroomgebied en het aandeel intensieve landbouw op enerzijds de biotische index (Beta verdeling en logistische link functie) en anderzijds de 'winterhalfjaar' nitraatconcentratie (Normale verdeling met afknotting van waarden onder nul).
 Het model waarbij biotische index de responsvariabele is, bevat eveneens een term om na te gaan of er een effect is van de nitraatconcentratie.
+Nitraatconcentratie is hierdoor een moderatorvariabele (Engels mediator): 
 
-Voor de biotische index vinden we geen significante effecten (zie @tbl-params-mediation en @fig-ce-mmif-aandeel-intensief).
+-   vergelijking 1: aandeel intensieve landbouw -> nitraatconcentratie
+-   vergelijking 2: nitraatconcentratie + aandeel intensieve landbouw -> biotische index
 
-Voor de nitraatconcentratie vinden we een zwak effect (p < 0.1) dat wijst op verhoogde winterhalfjaar nitraatconcentraties bij hoger aandeel intensieve landbouw (zie @tbl-params-mediation en @fig-ce-nitraat-aandeel-intensief).
+waardoor we zowel een direct effect hebben van aandeel intensieve landbouw (via vergelijking 2) als een indirect effect (via vergelijking 1, gemedieerd door nitraat).
+
+Voor de biotische index vinden we geen significante directe of indirecte effecten (zie @tbl-params-mediation).
+Voor de nitraatconcentratie vinden we enkel een significant effect dat wijst op verhoogde winterhalfjaar nitraatconcentraties bij hoger aandeel intensieve landbouw (zie @tbl-params-mediation en @fig-ce-mmif-nitraat-aandeel-intensief) in afstroomgebieden met graanteelt dominantie.
+
+@fig-ce-mmif-nitraat-aandeel-intensief toont dat in afstroomgebieden met dominantie van graanteelt er ogenschijnlijk een omgekeerd verband is tussen de directe effecten van aandeel intensieve landbouw en nitraatconcentratie in het winterhalfjaar.
+Deze relaties zijn echter niet significant en het is twijfelachtig of beide relaties standhouden indien we over een grotere steekproef hadden beschikt in dit stratum.
+
+De uiteindelijke bedoeling is echter geen evaluatie van de toestand in een bepaald jaar, maar nagaan hoe - mits jaarlijkse opvolging van dezelfde locaties - de biotische en fysicochemische variabelen evolueren in functie van wijzigingen binnen de afstroomgebieden, zoals het voorzien van bufferstroken rond waterlopen.
+De nieuwe ecoregeling bufferstroken start in 2026.
+We hebben voor de hier geselecteerde afstroomgebieden nog niet in kaart gebracht om hoeveel oppervlakte aan bufferstroken het gaat en welke beschermingsmaatregelen er gelden.
+
 
 ```{r}
 #| label: brms-model
@@ -717,33 +803,38 @@ m_mmif <- brm(
 
 ```{r}
 #| label: tbl-params-mediation
-#| tbl-cap: "Directe, indirecte en totale effecten van aandeel intensieve landbouw"
+#| tbl-cap: "Directe, indirecte en totale effecten voor nitraatconcentratie en biotische index. De schattingen zijn in de originele schaal voor nitraatconcentratie en in de logit schaal voor de biotische index."
 
 pdfun <- function(x, nsamp = 4000) {
   pmax(sum(x > 0) / nsamp, sum(x < 0) / nsamp)
 }
 
 # 1. Define the coefficient names to make the formulas readable
-# Path a: aandeel -> resultaat
+# Path a: aandeel -> resultaat (x -> m; treatment -> mediator)
+# identity link
 a_ref  <- "resultaat_aandeel_intensief"
 a_diff <- "resultaat_aandeel_intensief:fgroupMaïsdominant"
 
-# Path b: resultaat -> bio_index
+# Path b: resultaat -> bio_index (m -> y; mediator -> outcome/response)
+# logit link
 b_ref <- "bioindexwaarde_resultaat"
 b_diff <- "bioindexwaarde_fgroupMaïsdominant:resultaat"
 
-# Path c' (Direct): aandeel -> bio_index
+# Path c' (Direct): aandeel -> bio_index (x -> y, treatment -> outcome/response)
+# logit link
 c_ref  <- "bioindexwaarde_aandeel_intensief"
 c_diff <- "bioindexwaarde_aandeel_intensief:fgroupMaïsdominant"
 
 # 2. Run the hypotheses
-# We calculate the Indirect effect (a*b) and Total effect (c + a*b)
+# We calculate the Direct effects, Indirect effects (a*b) and Total effects
+# (c + a*b)
 med_tests <- hypothesis(
   m_mmif,
   c(
     # --- Reference Group ---
     "nitraat_direct_effect_aandeelintensief_graan" = paste0(a_ref, " = 0"),
     "mmif_direct_effect_aandeelintensief_graan" = paste0(c_ref, " = 0"),
+    "mmif_direct_effect_nitraat_graan" = paste0(b_ref, " = 0"),
     "mmif_indirect_effect_aandeelintensief_graan" =
       paste0(a_ref, " * ", b_ref, " = 0"),
     "mmif_total_effect_aandeelintensief_graan" = paste0(
@@ -755,6 +846,8 @@ med_tests <- hypothesis(
       paste0("( ", a_ref, " + ", a_diff, ") = 0"),
     "mmif_direct_effect_aandeelintensief_mais" =
       paste0(c_ref, " + ", c_diff, " = 0"),
+    "mmif_direct_effect_nitraat_mais" =
+      paste0(b_ref, " + ", b_diff, " = 0"),
     "mmif_indirect_effect_aandeelintensief_mais" = paste0(
       "(", a_ref, " + ", a_diff, ") * (", b_ref, " + ", b_diff, ") = 0"),
     "mmif_total_effect_aandeelintensief_mais" = paste0(
@@ -762,7 +855,7 @@ med_tests <- hypothesis(
       b_ref, " + ", b_diff, ")) = 0"
     )
   ),
-  robust = TRUE
+  robust = FALSE
 )
 
 # 3. View results
@@ -800,9 +893,16 @@ eoi |>
 
 
 ```{r}
-#| label: fig-ce-mmif-aandeel-intensief
-#| fig-cap: "Conditionele effecten van aandeel intensieve landbouw en nitraatconcentratie op biotische index"
-#| fig-width: 10.24
+#| eval: FALSE
+# compare with mediation(), only returns the effects for "graan"
+bayestestR::mediation(m_mmif, centrality = "mean")
+```
+
+
+```{r}
+#| label: fig-ce-mmif-nitraat-aandeel-intensief
+#| fig-cap: "Conditionele directe effecten van aandeel intensieve landbouw en nitraatconcentratie op biotische index en van aandeel intensieve landbouw op nitraatconcentratie."
+#| fig-width: 10
 
 p <- conditional_effects(
   m_mmif,
@@ -840,15 +940,9 @@ q <- q[[1]] +
     x = "Nitraatconcentratie (winterhalfjaar)",
     y = "Biotische index"
   )
-p + q + plot_layout(guides = "collect", axes = "collect")
-```
 
 
-```{r}
-#| label: fig-ce-nitraat-aandeel-intensief
-#| fig-cap: "Conditioneel effect van aandeel intensieve landbouw op nitraatconcentratie"
-
-p <- conditional_effects(
+r <- conditional_effects(
   m_mmif,
   "aandeel_intensief:fgroup",
   resp = "resultaat"
@@ -858,7 +952,7 @@ p <- conditional_effects(
   plot = FALSE
 )
 
-p[[1]] +
+r <- r[[1]] +
   scale_color_discrete() +
   scale_fill_discrete() +
   labs(
@@ -866,6 +960,9 @@ p[[1]] +
     x = "Aandeel intensieve landbouw",
     y = "Nitraat [mg N/L]"
   )
+
+(p + q) / (r + plot_spacer()) +
+  plot_layout(guides = "collect", axes = "collect")
 ```
 
 # Conclusies
