@@ -125,10 +125,10 @@ water_1m <- read_sf(
 )
 # alle VHA waterlopen
 water_3m <- read_sf(
- here::here(
+  here::here(
     "data", "waterlagen",
     "water_3m_fytovrij_1m_teelt_en_5_of_10m_mestvrij_2025_2025-02-19.gpkg"
- )
+  )
 )
 
 identical(names(water_1m), names(water_3m))
@@ -200,7 +200,7 @@ watersheds_aandeel_landbouw <- watersheds_gewasgroep_2024  |>
   )
 
 watersheds_aandeel_grasland <- watersheds_gewasgroep_2024  |>
-  filter(GWSGRPH_LB  == "Grasland") |> 
+  filter(GWSGRPH_LB  == "Grasland") |>
   group_by(meetplaats) |>
   summarise(
     area_prop = sum(area_prop),
@@ -225,7 +225,7 @@ aandelen_2024 <- ws_aandeel_lb_intensief |>
   left_join(
     watersheds_aandeel_landbouw |>
       select(meetplaats, aandeel_landbouw = area_prop)
-  ) |> 
+  ) |>
   left_join(
     watersheds_aandeel_grasland |>
       select(meetplaats, aandeel_grasland = area_prop)
@@ -241,7 +241,7 @@ watersheds <- watersheds |>
   select(rowname, meetplaats, opp_ha, overlap_vlndrn, fgroup, geom) |>
   left_join(
     aandelen_2024, by = join_by(meetplaats)
-  ) |> 
+  ) |>
   left_join(
     aandelen_buffers, by = join_by(meetplaats)
   )
@@ -307,7 +307,7 @@ watersheds |>
 #| tbl-cap: "Karakteristieken van de afstroomgebieden per gewastype"
 
 watersheds |>
-  st_drop_geometry() |> 
+  st_drop_geometry() |>
   group_by(fgroup) |>
   summarise(
     aantal_locaties = n(),
@@ -358,7 +358,7 @@ watersheds |>
     aandeel_overig_landbouw =
       aandeel_landbouw - aandeel_intensief - aandeel_grasland
   ) |>
-  ggtern::ggtern() + 
+  ggtern::ggtern() +
   geom_point(
     ggtern::aes(
       x = aandeel_intensief,
@@ -366,7 +366,7 @@ watersheds |>
       z = aandeel_overig_landbouw,
       colour = fgroup
     )
-  ) + 
+  ) +
   theme(
     tern.axis.title.L = element_text(hjust = 0, vjust = 2),
     tern.axis.title.R = element_text(hjust = 1.3, vjust = 2)
@@ -383,7 +383,7 @@ In andere gebieden gaat het om meerdere percenten waar beschermingsmaatregelen m
 #| fig-cap: "Oppervlakte-aandelen bufferstroken"
 
 watersheds |>
-  ggplot() + 
+  ggplot() +
   geom_point(
     aes(
       x = aandeel_vha_waterlopen,
@@ -405,7 +405,7 @@ Niet elk van deze variabelen werd op elk meetlocatie in elke maand bemonsterd (z
 #| tbl-cap: "Overzicht van bemeten chemische variabelen"
 
 chem_res |>
-  group_by(parameter_symbool, parameter_omschrijving) |> 
+  group_by(parameter_symbool, parameter_omschrijving) |>
   summarise(
     aantal_metingen = n(),
     aantal_locaties = n_distinct(sample_point),
@@ -543,7 +543,7 @@ chem_subset_nn <- chem_res |>
       parameter_omschrijving, parameter_symbool, eenheid
     )
   ) |>
-  filter(parameter_omschrijving == "Nitraat") 
+  filter(parameter_omschrijving == "Nitraat")
 
 chem_jaar_nn <- chem_subset_nn |>
   mutate(
@@ -553,7 +553,11 @@ chem_jaar_nn <- chem_subset_nn |>
       maand %in% 4:9 ~ sprintf("Zomerhalfjaar %s", jaar),
       TRUE ~ NA
     ),
-    periode_ = ifelse(grepl("Winter", periode), "Winterhalfjaar\n(benadering 1,2 en 12 2024)", periode)
+    periode_ = ifelse(
+      grepl("Winter", periode),
+      "Winterhalfjaar\n(benadering 1,2 en 12 2024)",
+      periode
+    )
   ) |>
   filter(!is.na(periode)) |>
   group_by(
@@ -606,7 +610,7 @@ chem_jaar_nn |>
       mutate(sample_point = paste0("OW", meetplaats)) |>
       select(-fgroup),
     by = join_by(sample_point)
-  ) |> 
+  ) |>
   ggplot() +
   geom_point(
     aes(
@@ -625,7 +629,7 @@ chem_jaar_nn |>
     alpha = 0.3,
     method = "lm"
   ) +
-  facet_grid(parameter_omschrijving~periode_) +
+  facet_grid(parameter_omschrijving ~ periode_) +
   labs(y = "Concentratie")
 ```
 
@@ -653,10 +657,11 @@ mmif <- mmif |>
 mmif |>
   full_join(meetplaatsen, by = join_by(sample_point, wl_code)) |>
   rename(
-    beoordeling = klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
+    beoordeling =
+      klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
   ) |>
   count(fgroup, beoordeling) |>
-  group_by(fgroup) |> 
+  group_by(fgroup) |>
   mutate(percentage = sprintf("%.0f%%", n / sum(n) * 100)) |>
   kable(digits = 2)
 ```
@@ -676,8 +681,9 @@ mmif_colours <- c(
 mmif |>
   inner_join(meetplaatsen, by = join_by(sample_point, wl_code)) |>
   rename(
-    beoordeling = klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
-  ) |> 
+    beoordeling =
+      klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
+  ) |>
   ggplot() +
   stat_sum(
     aes(
@@ -710,7 +716,7 @@ mmif |>
       mutate(sample_point = paste0("OW", meetplaats)) |>
       select(-fgroup),
     by = join_by(sample_point)
-  ) |> 
+  ) |>
   ggplot() +
   geom_point(
     aes(
@@ -777,7 +783,7 @@ mmif_nn <- mmif |>
   mutate(
     jaar_mi = lubridate::year(hoofd_sample_sample_datum_monstername),
     maand_mi = lubridate::month(hoofd_sample_sample_datum_monstername)
-  ) |> 
+  ) |>
   rename(
     mmif_label = klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
   )
@@ -788,7 +794,7 @@ mmif_nn <- mmif_nn |>
       mutate(sample_point = paste0("OW", meetplaats)) |>
       select(-fgroup),
     by = join_by(sample_point)
-  ) 
+  )
 ```
 
 De fysicochemische en biotische data (beide op jaarbasis) worden aan elkaar gekoppeld op basis van hun locatie identificatie.
@@ -824,20 +830,20 @@ writeLines(
 )
 m_mmif <- brm(
   bf(
-    bio_index_waarde ~ 
+    bio_index_waarde ~
       aandeel_intensief +
-      fgroup +
-      resultaat +
-      aandeel_intensief:fgroup +
-      resultaat:fgroup,
+        fgroup +
+        resultaat +
+        aandeel_intensief:fgroup +
+        resultaat:fgroup,
     family = "beta",
     decomp = "QR"
   ) +
     bf(
-      resultaat | trunc(lb = 0) ~ 
+      resultaat | trunc(lb = 0) ~
         aandeel_intensief +
-        fgroup +
-        aandeel_intensief:fgroup
+          fgroup +
+          aandeel_intensief:fgroup
     ) +
     set_rescor(FALSE),
   data = mmif_nn,
@@ -856,7 +862,9 @@ m_mmif <- brm(
 
 ```{r}
 #| label: tbl-params-mediation
-#| tbl-cap: "Directe, indirecte en totale effecten voor nitraatconcentratie en biotische index. De schattingen zijn in de originele schaal voor nitraatconcentratie en in de logit schaal voor de biotische index."
+#| tbl-cap: "Directe, indirecte en totale effecten voor nitraatconcentratie en
+#|   biotische index. De schattingen zijn in de originele schaal voor
+#|   nitraatconcentratie en in de logit schaal voor de biotische index."
 
 pdfun <- function(x, nsamp = 4000) {
   pmax(sum(x > 0) / nsamp, sum(x < 0) / nsamp)
@@ -880,7 +888,7 @@ c_diff <- "bioindexwaarde_aandeel_intensief:fgroupMaïsdominant"
 
 # 2. Run the hypotheses
 # We calculate the Direct effects, Indirect effects (a*b) and Total effects
-# (c + a*b)
+# (c + a*b) # nolint
 med_tests <- hypothesis(
   m_mmif,
   c(
@@ -893,7 +901,7 @@ med_tests <- hypothesis(
     "mmif_total_effect_aandeelintensief_graan" = paste0(
       c_ref, " + (", a_ref, " * ", b_ref, ") = 0"
     ),
-    
+
     # --- Maïsdominant Group (must add interaction terms) ---
     "nitraat_direct_effect_aandeelintensief_mais" =
       paste0("( ", a_ref, " + ", a_diff, ") = 0"),
@@ -901,8 +909,10 @@ med_tests <- hypothesis(
       paste0(c_ref, " + ", c_diff, " = 0"),
     "mmif_direct_effect_nitraat_mais" =
       paste0(b_ref, " + ", b_diff, " = 0"),
-    "mmif_indirect_effect_aandeelintensief_mais" = paste0(
-      "(", a_ref, " + ", a_diff, ") * (", b_ref, " + ", b_diff, ") = 0"),
+    "mmif_indirect_effect_aandeelintensief_mais" =
+      paste0(
+        "(", a_ref, " + ", a_diff, ") * (", b_ref, " + ", b_diff, ") = 0"
+      ),
     "mmif_total_effect_aandeelintensief_mais" = paste0(
       "(", c_ref, " + ", c_diff, ") + ((", a_ref, " + ", a_diff, ") * (",
       b_ref, " + ", b_diff, ")) = 0"
@@ -913,7 +923,7 @@ med_tests <- hypothesis(
 
 # 3. View results
 eoi <- med_tests$hypothesis |>
-  select(-Evid.Ratio, -Post.Prob, -Star) |> 
+  select(-Evid.Ratio, -Post.Prob, -Star) |>
   bind_cols(
     med_tests$samples |>
       pivot_longer(
@@ -954,7 +964,9 @@ bayestestR::mediation(m_mmif, centrality = "mean")
 
 ```{r}
 #| label: fig-ce-mmif-nitraat-aandeel-intensief
-#| fig-cap: "Conditionele directe effecten van aandeel intensieve landbouw en nitraatconcentratie op biotische index en van aandeel intensieve landbouw op nitraatconcentratie."
+#| fig-cap: "Conditionele directe effecten van aandeel intensieve landbouw en
+#|  nitraatconcentratie op biotische index en van aandeel intensieve landbouw op
+#|  nitraatconcentratie."
 #| fig-width: 10
 
 p <- conditional_effects(

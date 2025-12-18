@@ -68,10 +68,10 @@ landusemetrics_grid_cell <- function(
   weight_col = NULL,
   progress = FALSE
 ) {
-  require(duckdb)
-  require(dplyr)
-  require(sf)
-  require(rlang)
+  require("duckdb")
+  require("dplyr")
+  require("sf")
+  require("rlang")
   if (inherits(layer, "SpatRaster") || inherits(layer, "RasterLayer")) {
     crs_grid <- gsub("^((.*?),\\n\\s*?){2}", "", sf::st_crs(grid_cell)$wkt)
     crs_layer <- gsub("^((.*?),\\n\\s*?){2}", "", terra::crs(layer))

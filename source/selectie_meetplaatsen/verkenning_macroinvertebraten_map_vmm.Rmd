@@ -1173,9 +1173,9 @@ ws_3_4 <- watersheds_selectie %>%
   filter(group %in% groepen)
 
 mapview(
-    ws_3_4, zcol = "fgroup",
-    alpha.regions = 0.3
-  )
+  ws_3_4, zcol = "fgroup",
+  alpha.regions = 0.3
+)
 ```
 
 
@@ -1243,7 +1243,6 @@ st_write(
     "selectie_watersheds_mbag_macroinvertebraten.gpkg"
   )
 )
-
 ```
 
 
