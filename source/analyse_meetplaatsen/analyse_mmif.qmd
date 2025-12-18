@@ -343,6 +343,57 @@ watersheds |>
 
 # Verkenning
 
+## Aandelen landgebruik en bufferstroken
+
+@fig-aandeel-landbouw toont de verdeling van de aandelen landbouw (ruwe opdeling in intensieve landbouw, grasland en overige).
+Er is een duidelijke scheiding tussen beide groepen: in de groep met dominantie van graanteelten is het aandeel overige landbouw < 20% (op één uitzondering na) en in de groep met dominantie van maïsteelt is het aandeel overige landbouw > 20% (< 60%).
+
+
+```{r}
+#| label: fig-aandeel-landbouw
+#| fig-cap: "Oppervlakte-aandelen landbouw"
+
+watersheds |>
+  mutate(
+    aandeel_overig_landbouw =
+      aandeel_landbouw - aandeel_intensief - aandeel_grasland
+  ) |>
+  ggtern::ggtern() + 
+  geom_point(
+    ggtern::aes(
+      x = aandeel_intensief,
+      y = aandeel_grasland,
+      z = aandeel_overig_landbouw,
+      colour = fgroup
+    )
+  ) + 
+  theme(
+    tern.axis.title.L = element_text(hjust = 0, vjust = 2),
+    tern.axis.title.R = element_text(hjust = 1.3, vjust = 2)
+  )
+```
+
+@fig-aandeel-buffers toont de oppervlakte-aandelen waar beschermingsmaatregelen worden opgelegd in bufferstroken rond waterlopen en andere waterlichamen.
+Er zijn grote verschillen tussen de afstroomgebieden.
+In sommige gebieden zijn de oppervlakte-aandelen verwaarloosbaar klein.
+In andere gebieden gaat het om meerdere percenten waar beschermingsmaatregelen moeten worden getroffen.
+
+```{r}
+#| label: fig-aandeel-buffers
+#| fig-cap: "Oppervlakte-aandelen bufferstroken"
+
+watersheds |>
+  ggplot() + 
+  geom_point(
+    aes(
+      x = aandeel_vha_waterlopen,
+      y = aandeel_oppervlaktewaterlichamen,
+      colour = fgroup
+    )
+  )
+```
+
+
 ## Fysico-chemische waterkwaliteit
 
 In 2024 werden maandelijks waterstalen genomen.
@@ -760,7 +811,6 @@ Deze relaties zijn echter niet significant en het is twijfelachtig of beide rela
 
 De uiteindelijke bedoeling is echter geen evaluatie van de toestand in een bepaald jaar, maar nagaan hoe - mits jaarlijkse opvolging van dezelfde locaties - de biotische en fysicochemische variabelen evolueren in functie van wijzigingen binnen de afstroomgebieden, zoals het voorzien van bufferstroken rond waterlopen.
 De nieuwe ecoregeling bufferstroken start in 2026.
-We hebben voor de hier geselecteerde afstroomgebieden nog niet in kaart gebracht om hoeveel oppervlakte aan bufferstroken het gaat en welke beschermingsmaatregelen er gelden.
 
 
 ```{r}
