@@ -5,7 +5,7 @@ author: "Hans Van Calster"
 date: "2025-12-15"
 lang: nl
 execute:
-  freeze: auto
+  freeze: false
   echo: true
   warning: false
 format:
@@ -352,25 +352,57 @@ Er is een duidelijke scheiding tussen beide groepen: in de groep met dominantie 
 ```{r}
 #| label: fig-aandeel-landbouw
 #| fig-cap: "Oppervlakte-aandelen landbouw"
+#| echo: true
+#| results: "asis"
 
-watersheds |>
-  mutate(
-    aandeel_overig_landbouw =
-      aandeel_landbouw - aandeel_intensief - aandeel_grasland
-  ) |>
-  ggtern::ggtern() +
-  geom_point(
-    ggtern::aes(
-      x = aandeel_intensief,
-      y = aandeel_grasland,
-      z = aandeel_overig_landbouw,
-      colour = fgroup
+# Run ggtern in a background process to isolate its side effects
+# it overrides INBOtheme / ggplot scales and theming
+plot_file <- here::here(
+  "source", "analyse_meetplaatsen", "__figures",
+  "ternary_plot.png"
+)
+plot_path <- callr::r(function(df, dest_path) {
+  library(ggtern)
+  library(dplyr)
+  p <- df |>
+    mutate(
+      aandeel_overig_landbouw =
+        aandeel_landbouw - aandeel_intensief - aandeel_grasland
+    ) |>
+    ggtern::ggtern() +
+    geom_point(
+      ggtern::aes(
+        x = aandeel_intensief,
+        y = aandeel_grasland,
+        z = aandeel_overig_landbouw,
+        colour = fgroup
+      )
+    ) +
+    theme(
+      tern.axis.title.L = element_text(hjust = -0.4, vjust = 2),
+      tern.axis.title.R = element_text(hjust = 1.3, vjust = 2)
+    ) +
+    labs(
+      colour = NULL,
+      x = "Aandeel intensieve landbouw",
+      y =  "Aandeel grasland",
+      z = "Aandeel overige landbouw"
+    ) +
+    scale_colour_manual(
+      values = c(
+        "Graanteelt dominant" = "#282A72",
+        "Maïs dominant" = "#EF972C"
+      )
     )
-  ) +
-  theme(
-    tern.axis.title.L = element_text(hjust = 0, vjust = 2),
-    tern.axis.title.R = element_text(hjust = 1.3, vjust = 2)
-  )
+  
+  # Save 
+  ggsave(dest_path, p, device = "png", width = 7, height = 5)
+  return(invisible(NULL))
+},
+args = list(df = watersheds, dest_path = plot_file))
+
+# Display the resulting image in your Quarto doc
+knitr::include_graphics(plot_file)
 ```
 
 @fig-aandeel-buffers toont de oppervlakte-aandelen waar beschermingsmaatregelen worden opgelegd in bufferstroken rond waterlopen en andere waterlichamen.
@@ -390,6 +422,11 @@ watersheds |>
       y = aandeel_oppervlaktewaterlichamen,
       colour = fgroup
     )
+  ) +
+  labs(
+    x = "Aandeel bufferstroken langs VHA waterlopen",
+    y = "Aandeel bufferstroken langs overige oppervlaktewaters",
+    colour = NULL
   )
 ```
 
