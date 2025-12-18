@@ -512,7 +512,7 @@ Winterhalfjaar voor een bepaald jaar wordt gedefinieerd als de laatste maand van
 Volgens deze definitie kunnen we winterhalfjaar nog niet berekenen omdat we enkel beschikken over de data van 2024.
 We benaderen deze winterhalfjaarwaarde door het gemiddelde te nemen van de maanden januari, februari en december van 2024.
 
-Alle gemeten waarden voor nitraatconcentratie liggen lager dan de drempelwaarde van 18 mg N/L.
+Alle gemeten waarden voor nitraatconcentratie liggen lager dan de drempelwaarde van `18 mg N/L`.
 
 ```{r}
 #| label: nitraat-halfjaar
@@ -805,9 +805,9 @@ Het model waarbij biotische index de responsvariabele is, bevat eveneens een ter
 Nitraatconcentratie is hierdoor een moderatorvariabele (Engels mediator): 
 
 -   vergelijking 1: aandeel intensieve landbouw -> nitraatconcentratie
--   vergelijking 2: nitraatconcentratie + aandeel intensieve landbouw -> biotische index
+-   vergelijking 2: nitraatconcentratie `+` aandeel intensieve landbouw -> biotische index
 
-waardoor we zowel een direct effect hebben van aandeel intensieve landbouw (via vergelijking 2) als een indirect effect (via vergelijking 1, gemedieerd door nitraat).
+waardoor we zowel een direct effect hebben van aandeel intensieve landbouw (via vergelijking 2) als een indirect effect (via vergelijking 1, gemodereerd door nitraat).
 
 Voor de biotische index vinden we geen significante directe of indirecte effecten (zie @tbl-params-mediation).
 Voor de nitraatconcentratie vinden we enkel een significant effect dat wijst op verhoogde winterhalfjaar nitraatconcentraties bij hoger aandeel intensieve landbouw (zie @tbl-params-mediation en @fig-ce-mmif-nitraat-aandeel-intensief) in afstroomgebieden met graanteelt dominantie.
@@ -1033,8 +1033,8 @@ r <- r[[1]] +
 # Conclusies
 
 -   De onderzochte meetplaatsen zijn representatief voor middelgrote afstroomgebieden met een hoog aandeel landbouw. Vijftien meetplaatsen hebben een afstroomgebied waar graanteelten dominant zijn en 25 van de onderzochte meetplaatsen hebben aan afstroomgebied waar maïsteelt dominant. De eerste is wellicht op zwaardere klei en leem bodems en de tweede wellicht op lichtere zand en zandleem bodems.
--   In 2024 werden de locaties onderzocht op fysicochemische en biotische waterkwaliteit. Voor 4 lokaties ontbraken gegevens over de biotische waterkwaliteit. De fysicochemische data voor nitraat werden verder samengevat tot één waarde per (periode in een) jaar per meetlocatie.
--   Een eerste modellering toonde aan dat een hoger oppervlakte-aandeel intensieve landbouw de winterhalfjaar concentratie aan nitraat doet stijgen. De gemeten concentraties liggen lager dan de drempelwaarde van 18 mg N/L.
+-   In 2024 werden de locaties onderzocht op fysicochemische en biotische waterkwaliteit. Voor 4 locaties ontbraken gegevens over de biotische waterkwaliteit. De fysicochemische data voor nitraat werden verder samengevat tot één waarde per (periode in een) jaar per meetlocatie.
+-   Een eerste modellering toonde aan dat een hoger oppervlakte-aandeel intensieve landbouw de winterhalfjaar concentratie aan nitraat doet stijgen. De gemeten concentraties liggen lager dan de drempelwaarde van `18 mg N/L`.
 -   We vinden in deze beperkte dataset geen aantoonbaar negatief effect van deze eutrofiëring op de biotische kwaliteit gereflecteerd door de macro-invertebraten gemeenschap, noch indirect van het aandeel intensieve landbouw in het afstroomgebied.
 -   De biotische index wordt op de meeste locaties beoordeeld als matig tot goed.
 -   Deze monitoring voor het jaar 2024 zou jaarlijks herhaald moeten worden om op termijn effecten te kunnen aantonen van beschermende maatregelen zoals bufferstroken langs waterlopen. Dit zal steeds moeten gepaard gaan met een analyse waarbij rekening wordt gehouden met andere belangrijke factoren die _a priori_ niet kunnen gecontroleerd worden.
