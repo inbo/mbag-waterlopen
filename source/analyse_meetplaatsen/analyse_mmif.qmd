@@ -2,7 +2,7 @@
 title: "Verkennende analyse biologische en chemische waterkwaliteit in 40 locaties langs waterlopen geselecteerd in kader van het project monitoring biodiversiteit in het agrarisch gebied"
 subtitle: "Uitgangssituatie 2024"
 author: "Hans Van Calster"
-date: "2025-12-15"
+date: "2025-12-19"
 lang: nl
 execute:
   freeze: false
@@ -622,15 +622,6 @@ chem_jaar_nn |>
     position = position_dodge(width = 0.5),
     alpha = 0.3
   ) +
-  stat_summary(
-    aes(
-      x = fgroup,
-      y = resultaat,
-      colour = periode_
-    ),
-    position = position_dodge(width = 0.5),
-    fun.data = mean_cl_boot
-  ) +
   facet_wrap(~ sprintf("%s [%s]", parameter_omschrijving, eenheid))
 ```
 
@@ -638,7 +629,8 @@ chem_jaar_nn |>
 
 ```{r}
 #| label: fig-nitraat-aandeel-intensief
-#| fig-cap: "Relatie tussen aandeel intensieve landbouw en nitraatconcentratie"
+#| fig-cap: "Geobserveerde relatie tussen aandeel intensieve landbouw en
+#|   nitraatconcentratie"
 #| fig-width: 10
 
 chem_jaar_nn |>
@@ -655,16 +647,6 @@ chem_jaar_nn |>
       y = resultaat,
       colour = fgroup
     )
-  ) +
-  geom_smooth(
-    aes(
-      x = aandeel_intensief,
-      y = resultaat,
-      colour = fgroup,
-      fill = fgroup
-    ),
-    alpha = 0.3,
-    method = "lm"
   ) +
   facet_grid(parameter_omschrijving ~ periode_) +
   labs(y = "Concentratie")
@@ -729,13 +711,6 @@ mmif |>
       colour = beoordeling
     )
   ) +
-  stat_summary(
-    aes(
-      x = fgroup,
-      y = bio_index_waarde
-    ),
-    fun.data = mean_cl_boot
-  ) +
   scale_colour_manual(values = mmif_colours) +
   labs(x = NULL, colour = "Beoordeling", size = "Aantal\nlocaties")
 ```
@@ -744,7 +719,8 @@ mmif |>
 
 ```{r}
 #| label: fig-mmif-aandeel-intensief
-#| fig-cap: "Relatie tussen aandeel intensieve landbouw en biotische index"
+#| fig-cap: "Geobserveerde relatie tussen aandeel intensieve landbouw en
+#|   biotische index"
 
 mmif |>
   left_join(meetplaatsen) |>
@@ -762,17 +738,11 @@ mmif |>
       colour = fgroup
     )
   ) +
-  geom_smooth(
-    aes(
-      x = aandeel_intensief,
-      y = bio_index_waarde,
-      colour = fgroup,
-      fill = fgroup
-    ),
-    alpha = 0.3,
-    method = "lm"
-  ) +
-  labs(x = "Aandeel intensieve landbouw")
+  labs(
+    x = "Aandeel intensieve landbouw",
+    y = "Biotische index",
+    colour = NULL
+  )
 ```
 
 De staalname voor macro-invertebraten vond plaats tussen april en half oktober 2024.
@@ -780,7 +750,8 @@ De staalname voor macro-invertebraten vond plaats tussen april en half oktober 2
 
 ```{r}
 #| label: fig-mmif-datum
-#| fig-cap: "Relatie tussen datum van staalname en biotische index"
+#| fig-cap: "Geobserveerde relatie tussen datum van staalname en biotische
+#|  index"
 
 mmif |>
   left_join(meetplaatsen) |>
@@ -792,15 +763,10 @@ mmif |>
       colour = fgroup
     )
   ) +
-  geom_smooth(
-    aes(
-      x = hoofd_sample_sample_datum_monstername,
-      y = bio_index_waarde,
-      colour = fgroup,
-      fill = fgroup
-    ),
-    alpha = 0.3,
-    method = "lm"
+  labs(
+    x = "Datum monstername",
+    y = "Biotische index",
+    colour = NULL
   )
 ```
 
