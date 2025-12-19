@@ -394,8 +394,8 @@ plot_path <- callr::r(function(df, dest_path) {
         "Maïs dominant" = "#EF972C"
       )
     )
-  
-  # Save 
+
+  # Save
   ggsave(dest_path, p, device = "png", width = 7, height = 5)
   return(invisible(NULL))
 },
