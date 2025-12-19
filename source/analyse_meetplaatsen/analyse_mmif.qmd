@@ -139,7 +139,7 @@ water <- water_1m |>
       mutate(source = "VHA waterlopen")
   )
 rm(water_1m, water_3m)
-gc()
+invisible(gc())
 
 watersheds_bufferstroken <- landusemetrics_grid_cell(
   grid_cell = watersheds |>
@@ -346,7 +346,7 @@ watersheds |>
 ## Aandelen landgebruik en bufferstroken
 
 @fig-aandeel-landbouw toont de verdeling van de aandelen landbouw (ruwe opdeling in intensieve landbouw, grasland en overige).
-Er is een duidelijke scheiding tussen beide groepen: in de groep met dominantie van graanteelten is het aandeel overige landbouw < 20% (op één uitzondering na) en in de groep met dominantie van maïsteelt is het aandeel overige landbouw > 20% (< 60%).
+Er is een duidelijke scheiding tussen beide groepen: in de groep met dominantie van maïsteelten is het aandeel overige landbouw < 20% (op één uitzondering na) en in de groep met dominantie van graanteelt is het aandeel overige landbouw tussen 20% en 60%.
 
 
 ```{r}
@@ -838,7 +838,7 @@ De fysicochemische en biotische data (beide op jaarbasis) worden aan elkaar geko
 Zoals eerder aangegeven, zijn er vier locaties met ontbrekende waarden voor de biotische index.
 
 We fitten een model voor de effecten van het type afstroomgebied en het aandeel intensieve landbouw op enerzijds de biotische index (Beta verdeling en logistische link functie) en anderzijds de 'winterhalfjaar' nitraatconcentratie (Normale verdeling met afknotting van waarden onder nul).
-Het model waarbij biotische index de responsvariabele is, bevat eveneens een term om na te gaan of er een effect is van de nitraatconcentratie.
+Het model waarbij biotische index de responsvariabele is, bevat eveneens een term om na te gaan of er een effect is van de nitraatconcentratie in elk type afstroomgebied.
 Nitraatconcentratie is hierdoor een moderatorvariabele (Engels mediator): 
 
 -   vergelijking 1: aandeel intensieve landbouw -> nitraatconcentratie
@@ -1069,11 +1069,11 @@ r <- r[[1]] +
 
 # Conclusies
 
--   De onderzochte meetplaatsen zijn representatief voor middelgrote afstroomgebieden met een hoog aandeel landbouw. Vijftien meetplaatsen hebben een afstroomgebied waar graanteelten dominant zijn en 25 van de onderzochte meetplaatsen hebben aan afstroomgebied waar maïsteelt dominant. De eerste is wellicht op zwaardere klei en leem bodems en de tweede wellicht op lichtere zand en zandleem bodems.
+-   De onderzochte meetplaatsen vertegenwoordigen middelgrote afstroomgebieden met een hoog aandeel landbouw. Vijftien meetplaatsen hebben een afstroomgebied waar graanteelten dominant zijn en 25 van de onderzochte meetplaatsen hebben een afstroomgebied waar maïsteelt dominant is. De eerste is wellicht op zwaardere klei- en leembodems en de tweede wellicht op lichtere zand- en zandleembodems.
 -   In 2024 werden de locaties onderzocht op fysicochemische en biotische waterkwaliteit. Voor 4 locaties ontbraken gegevens over de biotische waterkwaliteit. De fysicochemische data voor nitraat werden verder samengevat tot één waarde per (periode in een) jaar per meetlocatie.
+-   De biotische index wordt op de meeste locaties beoordeeld als matig tot goed.
 -   Een eerste modellering toonde aan dat een hoger oppervlakte-aandeel intensieve landbouw de winterhalfjaar concentratie aan nitraat doet stijgen. De gemeten concentraties liggen lager dan de drempelwaarde van `18 mg N/L`.
 -   We vinden in deze beperkte dataset geen aantoonbaar negatief effect van deze eutrofiëring op de biotische kwaliteit gereflecteerd door de macro-invertebraten gemeenschap, noch indirect van het aandeel intensieve landbouw in het afstroomgebied.
--   De biotische index wordt op de meeste locaties beoordeeld als matig tot goed.
--   Deze monitoring voor het jaar 2024 zou jaarlijks herhaald moeten worden om op termijn effecten te kunnen aantonen van beschermende maatregelen zoals bufferstroken langs waterlopen. Dit zal steeds moeten gepaard gaan met een analyse waarbij rekening wordt gehouden met andere belangrijke factoren die _a priori_ niet kunnen gecontroleerd worden.
+-   Deze monitoring voor het jaar 2024 zou jaarlijks herhaald moeten worden om op termijn effecten te kunnen aantonen van beschermende maatregelen zoals bufferstroken langs waterlopen. Dit zal steeds moeten gepaard gaan met een analyse waarbij rekening wordt gehouden met andere belangrijke factoren die _a priori_ niet kunnen gecontroleerd worden. Er kan ook overwogen worden om het aantal meetplaatsen voor afstroomgebieden met dominantie van graanteelten te verhogen met een tiental extra meetplaatsen.
 
 
