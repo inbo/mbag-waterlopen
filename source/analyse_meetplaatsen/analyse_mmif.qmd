@@ -431,6 +431,41 @@ watersheds |>
 ```
 
 
+```{r}
+#| label: fig-aandeel-buffers-bars
+#| fig-cap: "Oppervlakte-aandelen bufferstroken"
+
+watersheds |>
+  st_drop_geometry() |>
+  pivot_longer(
+    cols = c(aandeel_vha_waterlopen, aandeel_oppervlaktewaterlichamen),
+    names_to = "buffer",
+    names_prefix = "aandeel_",
+    values_to = "aandeel"
+  ) |>
+  mutate(
+    meetplaats = reorder(meetplaats, aandeel)
+  ) |> 
+  ggplot() +
+  geom_col(
+    aes(
+      x = meetplaats,
+      y = aandeel,
+      fill = buffer
+    )
+  ) +
+  coord_flip() +
+  labs(
+    y = "Aandeel in afstroomgebied",
+    x = "Meetplaatsen"
+  ) +
+  facet_grid(rows = vars(fgroup), scales = "free_y") +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  
+```
+
+
+
 ## Fysico-chemische waterkwaliteit
 
 In 2024 werden maandelijks waterstalen genomen.
@@ -861,6 +896,129 @@ m_mmif <- brm(
 ```
 
 
+```{r}
+#| eval: false
+m_mmif_2 <- brm(
+  bf(
+    bio_index_waarde ~
+      aandeel_landbouw +
+        fgroup +
+        log(resultaat) +
+        aandeel_landbouw:fgroup +
+        log(resultaat):fgroup,
+    family = "beta",
+    decomp = "QR"
+  ) +
+    bf(
+      log(resultaat) ~
+        aandeel_landbouw +
+          fgroup +
+          aandeel_landbouw:fgroup,
+        family = gaussian()
+    ) +
+    set_rescor(FALSE),
+  data = mmif_nn,
+  prior = prior(normal(0, 1), class = "b"),
+  cores = 4,
+  sample_prior = TRUE,
+  file = here::here("source", "brms_model", "m_mmif_2"),
+  file_refit = "on_change",
+  backend = "cmdstanr"
+)
+
+pdfun <- function(x, nsamp = 4000) {
+  pmax(sum(x > 0) / nsamp, sum(x < 0) / nsamp)
+}
+
+# 1. Define the coefficient names to make the formulas readable
+# Path a: aandeel -> resultaat (x -> m; treatment -> mediator)
+# identity link
+a_ref  <- "logresultaat_aandeel_landbouw"
+a_diff <- "logresultaat_aandeel_landbouw:fgroupMaïsdominant"
+
+# Path b: resultaat -> bio_index (m -> y; mediator -> outcome/response)
+# logit link
+b_ref <- "bioindexwaarde_logresultaat"
+b_diff <- "bioindexwaarde_fgroupMaïsdominant:logresultaat"
+
+# Path c' (Direct): aandeel -> bio_index (x -> y, treatment -> outcome/response)
+# logit link
+c_ref  <- "bioindexwaarde_aandeel_landbouw"
+c_diff <- "bioindexwaarde_aandeel_landbouw:fgroupMaïsdominant"
+
+# 2. Run the hypotheses
+# We calculate the Direct effects, Indirect effects (a*b) and Total effects
+# (c + a*b) # nolint
+med_tests <- hypothesis(
+  m_mmif_2,
+  c(
+    # --- Reference Group ---
+    "nitraat_direct_effect_aandeellandbouw_graan" = paste0(a_ref, " = 0"),
+    "mmif_direct_effect_aandeellandbouw_graan" = paste0(c_ref, " = 0"),
+    "mmif_direct_effect_nitraat_graan" = paste0(b_ref, " = 0"),
+    "mmif_indirect_effect_aandeellandbouw_graan" =
+      paste0(a_ref, " * ", b_ref, " = 0"),
+    "mmif_total_effect_aandeellandbouw_graan" = paste0(
+      c_ref, " + (", a_ref, " * ", b_ref, ") = 0"
+    ),
+
+    # --- Maïsdominant Group (must add interaction terms) ---
+    "nitraat_direct_effect_aandeellandbouw_mais" =
+      paste0("( ", a_ref, " + ", a_diff, ") = 0"),
+    "mmif_direct_effect_aandeellandbouw_mais" =
+      paste0(c_ref, " + ", c_diff, " = 0"),
+    "mmif_direct_effect_nitraat_mais" =
+      paste0(b_ref, " + ", b_diff, " = 0"),
+    "mmif_indirect_effect_aandeellandbouw_mais" =
+      paste0(
+        "(", a_ref, " + ", a_diff, ") * (", b_ref, " + ", b_diff, ") = 0"
+      ),
+    "mmif_total_effect_aandeellandbouw_mais" = paste0(
+      "(", c_ref, " + ", c_diff, ") + ((", a_ref, " + ", a_diff, ") * (",
+      b_ref, " + ", b_diff, ")) = 0"
+    )
+  ),
+  robust = FALSE
+)
+
+# 3. View results
+eoi <- med_tests$hypothesis |>
+  select(-Evid.Ratio, -Post.Prob, -Star) |>
+  bind_cols(
+    med_tests$samples |>
+      pivot_longer(
+        everything()
+      ) |>
+      group_by(
+        name
+      ) |>
+      summarise(
+        pd = pdfun(value),
+        pval = 2 * (1 - pd)
+      ) |>
+      mutate(
+        name = factor(name, levels = paste0("H", seq_len(n())))
+      ) |>
+      arrange(name) |>
+      select(-name)
+  ) |>
+  separate_wider_regex(
+    cols = Hypothesis,
+    patterns = c(
+      responsvariabele = ".*?",
+      "_",
+      type = ".*_effect",
+      "_",
+      effect = ".*?",
+      "_",
+      groep = ".*"
+    )
+  )
+eoi |>
+  kable(digits = 3)
+
+```
+
 
 
 ```{r}
@@ -939,6 +1097,10 @@ eoi <- med_tests$hypothesis |>
         pd = pdfun(value),
         pval = 2 * (1 - pd)
       ) |>
+      mutate(
+        name = factor(name, levels = paste0("H", seq_len(n())))
+      ) |>
+      arrange(name) |>
       select(-name)
   ) |>
   separate_wider_regex(
