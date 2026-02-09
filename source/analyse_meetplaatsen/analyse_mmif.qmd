@@ -1,0 +1,1207 @@
+---
+title: "Verkennende analyse biologische en chemische waterkwaliteit in 40 locaties langs waterlopen geselecteerd in kader van het project monitoring biodiversiteit in het agrarisch gebied"
+subtitle: "Uitgangssituatie 2024"
+author: "Hans Van Calster"
+date: "2025-12-19"
+lang: nl
+execute:
+  freeze: false
+  echo: true
+  warning: false
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+    toc: true
+    toc-depth: 3
+    number-sections: true
+knitr:
+  opts_chunk: 
+    fig.path: __figures/
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(knitr)
+library(dplyr)
+library(sf)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(INBOtheme)
+library(brms)
+library(patchwork)
+
+source(here::here("source", "R", "geocomputations.R"))
+conflicted::conflicts_prefer(dplyr::filter)
+conflicted::conflicts_prefer(brms::ar)
+```
+
+```{r}
+#| label: inlezen
+
+meetplaatsen <- readr::read_csv2(here::here(
+  "data",
+  "vmm",
+  "selectie_meetplaatsen_mbag_macroinvertebraten.csv"
+))
+mmif <- readxl::read_excel(
+  path = here::here(
+    "data",
+    "vmm",
+    "data_2025",
+    "Beoordeling MMIF per sample point MBAG.xlsx"
+  ),
+  sheet = "MMIF"
+) |>
+  janitor::clean_names()
+chem_res <- readxl::read_excel(
+  path = here::here(
+    "data", "vmm", "data_2025",
+    "Analyseresultaten per meetplaats MBAG.xlsx"
+  ),
+  sheet = "Resultaten"
+) |> janitor::clean_names()
+
+chem_par <- readxl::read_excel(
+  path = here::here(
+    "data", "vmm", "data_2025",
+    "Analyseresultaten per meetplaats MBAG.xlsx"
+  ),
+  sheet = "Parameters"
+) |> janitor::clean_names()
+
+chem_loc <- readxl::read_excel(
+  path = here::here(
+    "data", "vmm", "data_2025",
+    "Analyseresultaten per meetplaats MBAG.xlsx"
+  ),
+  sheet = "SamplePoints"
+) |> janitor::clean_names()
+
+watersheds <- read_sf(
+  here::here(
+    "data", "vmm",
+    "selectie_watersheds_mbag_macroinvertebraten.gpkg"
+  )
+)
+
+watersheds$fgroup <- factor(
+  watersheds$fgroup,
+  levels = c(
+    "Granen 20% +\nGrasland 18% +\nMaïs 14%\n(total 70%)",
+    "Maïs 29% +\nGrasland 25% +\nAardappelen 7%\n(total 72%)"
+  ),
+  labels = c(
+    "Graanteelt dominant",
+    "Maïs dominant"
+  )
+)
+meetplaatsen$fgroup <- factor(
+  meetplaatsen$fgroup,
+  levels = c(
+    "Granen 20% +\r\nGrasland 18% +\r\nMaïs 14%\r\n(total 70%)",
+    "Maïs 29% +\r\nGrasland 25% +\r\nAardappelen 7%\r\n(total 72%)"
+  ),
+  labels = c(
+    "Graanteelt dominant",
+    "Maïs dominant"
+  )
+)
+```
+
+
+```{r}
+#| label: water-bufferstroken
+
+# alle oppervlaktewaterlichamen
+water_1m <- read_sf(
+  here::here(
+    "data", "waterlagen",
+    "water_1m_fytovrij_1m_teelt_en_5_of_10m_mestvrij_2025_2025-02-19.gpkg"
+  )
+)
+# alle VHA waterlopen
+water_3m <- read_sf(
+  here::here(
+    "data", "waterlagen",
+    "water_3m_fytovrij_1m_teelt_en_5_of_10m_mestvrij_2025_2025-02-19.gpkg"
+  )
+)
+
+identical(names(water_1m), names(water_3m))
+water <- water_1m |>
+  mutate(source = "oppervlaktewaterlichamen") |>
+  bind_rows(
+    water_3m |>
+      mutate(source = "VHA waterlopen")
+  )
+rm(water_1m, water_3m)
+invisible(gc())
+
+watersheds_bufferstroken <- landusemetrics_grid_cell(
+  grid_cell = watersheds |>
+    rename(geometry = geom) |>
+    st_transform(31370),
+  layer = water %>%
+    select(source, geom)  |>
+    rename(geometry = geom) |>
+    st_transform(31370),
+  grid_group_by_col = "meetplaats",
+  layer_group_by_col = "source"
+)
+
+aandelen_buffers <- watersheds_bufferstroken |>
+  pivot_wider(
+    id_cols = meetplaats,
+    names_from = source,
+    values_from = area_prop,
+    names_prefix = "aandeel_",
+    values_fill = 0
+  ) |>
+  janitor::clean_names()
+```
+
+```{r}
+#| label: landbouwgebruikspercelen-2024
+
+lbg_2024 <- read_sf(
+  here::here(
+    "data", "landbouwgebruikspercelen",
+    "lbg_2024.gpkg"
+  )
+)
+
+lbg_2024 <- lbg_2024 |>
+  st_intersection(watersheds)
+lbg_2024 <- lbg_2024 |>
+  st_cast("GEOMETRYCOLLECTION") |>
+  st_collection_extract("POLYGON")
+
+watersheds_gewasgroep_2024 <- landusemetrics_grid_cell(
+  grid_cell = watersheds |>
+    rename(geometry = geom) |>
+    st_transform(31370),
+  layer = lbg_2024 %>%
+    select(GWSGRPH_LB, geom)  |>
+    rename(geometry = geom) |>
+    st_transform(31370),
+  grid_group_by_col = "meetplaats",
+  layer_group_by_col = "GWSGRPH_LB"
+)
+
+watersheds_aandeel_landbouw <- watersheds_gewasgroep_2024  |>
+  group_by(meetplaats) |>
+  summarise(
+    area_prop = sum(area_prop),
+    area_ha = sum(area_m2) / 1e4
+  )
+
+watersheds_aandeel_grasland <- watersheds_gewasgroep_2024  |>
+  filter(GWSGRPH_LB  == "Grasland") |>
+  group_by(meetplaats) |>
+  summarise(
+    area_prop = sum(area_prop),
+    area_ha = sum(area_m2) / 1e4
+  )
+
+ws_aandeel_lb_intensief <- watersheds_gewasgroep_2024 %>%
+  filter(GWSGRPH_LB %in% c(
+    "Aardappelen",
+    "Maïs",
+    "Groenten, kruiden en sierplanten",
+    "Voedergewassen"
+  )) %>%
+  group_by(meetplaats) %>%
+  summarise(
+    area_prop = sum(area_prop),
+    area_ha = sum(area_m2) / 1e4
+  )
+
+aandelen_2024 <- ws_aandeel_lb_intensief |>
+  select(meetplaats, aandeel_intensief = area_prop) |>
+  left_join(
+    watersheds_aandeel_landbouw |>
+      select(meetplaats, aandeel_landbouw = area_prop)
+  ) |>
+  left_join(
+    watersheds_aandeel_grasland |>
+      select(meetplaats, aandeel_grasland = area_prop)
+  )
+
+```
+
+
+```{r}
+#| label: watersheds-aandelen
+
+watersheds <- watersheds |>
+  select(rowname, meetplaats, opp_ha, overlap_vlndrn, fgroup, geom) |>
+  left_join(
+    aandelen_2024, by = join_by(meetplaats)
+  ) |>
+  left_join(
+    aandelen_buffers, by = join_by(meetplaats)
+  )
+```
+
+
+```{r}
+#| label: join-meetplaatsen
+
+meetplaatsen <- meetplaatsen |>
+  mutate(
+    sample_point = paste0("OW", meetplaats)
+  ) |>
+  inner_join(chem_loc, by = join_by(bekken, waterloop, sample_point))
+```
+
+```{r}
+#| label: checks
+#| include: false
+
+all(abs(meetplaatsen$lambert_x - meetplaatsen$X) < 0.01)
+all(abs(meetplaatsen$lambert_y - meetplaatsen$Y) < 0.01)
+
+!any(duplicated(meetplaatsen$sample_point))
+!any(duplicated(chem_loc$sample_point))
+
+# 1 loc met twee data mmif
+!any(duplicated(mmif$sample_point))
+mmif[mmif$sample_point == mmif$sample_point[duplicated(mmif$sample_point)], ]
+
+
+!any(is.na(chem_loc$sample_point))
+!any(is.na(meetplaatsen$sample_point))
+!any(is.na(mmif$sample_point))
+
+setdiff(meetplaatsen$sample_point, chem_loc$sample_point)
+setdiff(chem_loc$sample_point, meetplaatsen$sample_point)
+
+setdiff(meetplaatsen$sample_point, mmif$sample_point)
+setdiff(mmif$sample_point, meetplaatsen$sample_point)
+```
+
+# Inleiding
+
+In 2024 werden door de VMM op 40 locaties langs waterlopen stalen genomen om de biologische en chemische waterkwaliteit te beoordelen.
+De locaties werden geselecteerd uit de ruime set aan bestaande staalnamelocaties op basis van een karakterisatie van de afstroomgebieden voor elk van de locaties en de kwaliteit van de bestaande meetreeksen.
+De 40 staalnamelocaties betreffen middelgrote afstroomgebieden met een hoog aandeel landbouw.
+
+Het oppervlakte-aandeel van alle gewasgroepen is het oppervlakte-aandeel landbouw.
+Als benadering van intensieve landbouw, is het oppervlakte-aandeel van gewasgroepen "Aardappelen", "Maïs", "Groenten, kruiden en sierplanten" en "Voedergewassen" (eerder stikstof-eisende gewassen / gewassen die sterker bemest worden) samengeteld.
+
+```{r}
+#| label: fig-ligging
+#| fig-cap: "Ligging van de geselecteerde afstroomgebieden volgens gewastype"
+
+watersheds |>
+  ggplot() +
+  geom_sf(aes(fill = fgroup))
+```
+
+```{r}
+#| label: tbl-fgroup
+#| tbl-cap: "Karakteristieken van de afstroomgebieden per gewastype"
+
+watersheds |>
+  st_drop_geometry() |>
+  group_by(fgroup) |>
+  summarise(
+    aantal_locaties = n(),
+    oppervlakte_ha = sprintf(
+      "%0.0f [%0.0f - %0.0f]", mean(opp_ha), min(opp_ha), max(opp_ha)
+    ),
+    aandeel_landbouw = sprintf(
+      "%0.2f [%0.2f - %0.2f]",
+      mean(aandeel_landbouw), min(aandeel_landbouw), max(aandeel_landbouw)
+    ),
+    aandeel_intensief = sprintf(
+      "%0.2f [%0.2f - %0.2f]",
+      mean(aandeel_intensief), min(aandeel_intensief), max(aandeel_intensief)
+    ),
+    aandeel_grasland = sprintf(
+      "%0.2f [%0.2f - %0.2f]",
+      mean(aandeel_grasland), min(aandeel_grasland), max(aandeel_grasland)
+    ),
+    aandeel_buffer_vha = sprintf(
+      "%0.2f [%0.2f - %0.2f]",
+      mean(aandeel_vha_waterlopen), min(aandeel_vha_waterlopen),
+      max(aandeel_vha_waterlopen)
+    ),
+    aandeel_buffer_oppwater = sprintf(
+      "%0.2f [%0.2f - %0.2f]",
+      mean(aandeel_oppervlaktewaterlichamen),
+      min(aandeel_oppervlaktewaterlichamen),
+      max(aandeel_oppervlaktewaterlichamen)
+    )
+  ) |>
+  kable(digits = 2)
+```
+
+# Verkenning
+
+## Aandelen landgebruik en bufferstroken
+
+@fig-aandeel-landbouw toont de verdeling van de aandelen landbouw (ruwe opdeling in intensieve landbouw, grasland en overige).
+Er is een duidelijke scheiding tussen beide groepen: in de groep met dominantie van maïsteelten is het aandeel overige landbouw < 20% (op één uitzondering na) en in de groep met dominantie van graanteelt is het aandeel overige landbouw tussen 20% en 60%.
+
+
+```{r}
+#| label: fig-aandeel-landbouw
+#| fig-cap: "Oppervlakte-aandelen landbouw"
+#| echo: true
+#| results: "asis"
+
+# Run ggtern in a background process to isolate its side effects
+# it overrides INBOtheme / ggplot scales and theming
+plot_file <- here::here(
+  "source", "analyse_meetplaatsen", "__figures",
+  "ternary_plot.png"
+)
+plot_path <- callr::r(function(df, dest_path) {
+  library(ggtern)
+  library(dplyr)
+  p <- df |>
+    mutate(
+      aandeel_overig_landbouw =
+        aandeel_landbouw - aandeel_intensief - aandeel_grasland
+    ) |>
+    ggtern::ggtern() +
+    geom_point(
+      ggtern::aes(
+        x = aandeel_intensief,
+        y = aandeel_grasland,
+        z = aandeel_overig_landbouw,
+        colour = fgroup
+      )
+    ) +
+    theme(
+      tern.axis.title.L = element_text(hjust = -0.4, vjust = 2),
+      tern.axis.title.R = element_text(hjust = 1.3, vjust = 2)
+    ) +
+    labs(
+      colour = NULL,
+      x = "Aandeel intensieve landbouw",
+      y =  "Aandeel grasland",
+      z = "Aandeel overige landbouw"
+    ) +
+    scale_colour_manual(
+      values = c(
+        "Graanteelt dominant" = "#282A72",
+        "Maïs dominant" = "#EF972C"
+      )
+    )
+
+  # Save
+  ggsave(dest_path, p, device = "png", width = 7, height = 5)
+  return(invisible(NULL))
+},
+args = list(df = watersheds, dest_path = plot_file))
+
+# Display the resulting image in your Quarto doc
+knitr::include_graphics(plot_file)
+```
+
+@fig-aandeel-buffers toont de oppervlakte-aandelen waar beschermingsmaatregelen worden opgelegd in bufferstroken rond waterlopen en andere waterlichamen.
+Er zijn grote verschillen tussen de afstroomgebieden.
+In sommige gebieden zijn de oppervlakte-aandelen verwaarloosbaar klein.
+In andere gebieden gaat het om meerdere percenten waar beschermingsmaatregelen moeten worden getroffen.
+
+```{r}
+#| label: fig-aandeel-buffers
+#| fig-cap: "Oppervlakte-aandelen bufferstroken"
+
+watersheds |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = aandeel_vha_waterlopen,
+      y = aandeel_oppervlaktewaterlichamen,
+      colour = fgroup
+    )
+  ) +
+  labs(
+    x = "Aandeel bufferstroken langs VHA waterlopen",
+    y = "Aandeel bufferstroken langs overige oppervlaktewaters",
+    colour = NULL
+  )
+```
+
+
+```{r}
+#| label: fig-aandeel-buffers-bars
+#| fig-cap: "Oppervlakte-aandelen bufferstroken"
+
+watersheds |>
+  st_drop_geometry() |>
+  pivot_longer(
+    cols = c(aandeel_vha_waterlopen, aandeel_oppervlaktewaterlichamen),
+    names_to = "buffer",
+    names_prefix = "aandeel_",
+    values_to = "aandeel"
+  ) |>
+  mutate(
+    meetplaats = reorder(meetplaats, aandeel)
+  ) |> 
+  ggplot() +
+  geom_col(
+    aes(
+      x = meetplaats,
+      y = aandeel,
+      fill = buffer
+    )
+  ) +
+  coord_flip() +
+  labs(
+    y = "Aandeel in afstroomgebied",
+    x = "Meetplaatsen"
+  ) +
+  facet_grid(rows = vars(fgroup), scales = "free_y") +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  
+```
+
+
+
+## Fysico-chemische waterkwaliteit
+
+In 2024 werden maandelijks waterstalen genomen.
+In totaal werden `r length(unique(chem_res$parameter_symbool))` verschillende fysicochemische variabelen bemeten.
+Niet elk van deze variabelen werd op elk meetlocatie in elke maand bemonsterd (zie @tbl-overzicht-chemvars en @tbl-overzicht-chemvars-per-maand).
+
+```{r}
+#| label: tbl-overzicht-chemvars
+#| tbl-cap: "Overzicht van bemeten chemische variabelen"
+
+chem_res |>
+  group_by(parameter_symbool, parameter_omschrijving) |>
+  summarise(
+    aantal_metingen = n(),
+    aantal_locaties = n_distinct(sample_point),
+    aantal_tijdstippen = n_distinct(sample_datum_monstername)
+  ) |>
+  arrange(-aantal_metingen) |>
+  kable(digits = 2)
+```
+
+```{r}
+#| label: tbl-overzicht-chemvars-per-maand
+#| tbl-cap: "Overzicht van bemeten chemische variabelen per maand"
+
+chem_res |>
+  mutate(
+    jaar = lubridate::year(sample_datum_monstername),
+    maand = lubridate::month(sample_datum_monstername)
+  ) |>
+  group_by(jaar, maand) |>
+  summarise(
+    aantal_locaties = n_distinct(sample_point),
+    aantal_meetvariabelen = n_distinct(parameter_omschrijving),
+    aantal_metingen = n()
+  ) |>
+  mutate(
+    periode = case_when(
+      maand %in% 1:2 ~ sprintf("Winterhalfjaar %s", jaar - 1),
+      maand == 12 ~ sprintf("Winterhalfjaar %s", jaar),
+      maand %in% 4:9 ~ sprintf("Zomerhalfjaar %s", jaar),
+      TRUE ~ NA
+    )
+  ) |>
+  relocate(periode) |>
+  kable(digits = 2)
+```
+
+We focussen op variabelen die gelinkt zijn met eutrofiëring.
+@fig-tijdreeksen-chemvars toont voor deze variabelen de maandelijkse gemeten waarden op elk van de locaties waarvoor er metingen beschikbaar zijn.
+De smoother toont de gemiddelde evolutie in beide groepen.
+
+```{r}
+#| label: fig-tijdreeksen-chemvars
+#| fig-cap: "Tijdsreeksen van stikstof- en fosforvariabelen"
+#| fig-width: 11
+#| column: page-right
+
+tijdreeksen <- chem_res |>
+  inner_join(meetplaatsen) |>
+  group_by(parameter_omschrijving, eenheid) |>
+  nest() |>
+  mutate(
+    parameter_label = sprintf("%s [%s]", parameter_omschrijving, eenheid)
+  ) |>
+  filter(
+    grepl("[Nn]itr|fosf", parameter_label)
+  ) |>
+  arrange(parameter_omschrijving) |>
+  mutate(
+    plot = map2(
+      data,
+      parameter_label,
+      \(x, y) {
+        ggplot(x) +
+          geom_point(
+            aes(
+              x = sample_datum_monstername, y = resultaat,
+              colour = fgroup, shape = teken
+            ), alpha = 0.9, size = 3
+          ) +
+          geom_line(
+            aes(
+              x = sample_datum_monstername, y = resultaat, group = sample_point,
+              colour = fgroup
+            ), alpha = 0.3
+          ) +
+          geom_smooth(
+            aes(
+              x = sample_datum_monstername, y = resultaat,
+              colour = fgroup, fill = fgroup
+            ), alpha = 0.3
+          ) +
+          scale_y_log10() +
+          labs(y = y, x = NULL, colour = NULL, fill = NULL) +
+          scale_shape_manual(values = c("<" = "<", "=" = "="))
+      }
+    )
+  )
+
+tijdreeksen$plot |>
+  patchwork::wrap_plots(guides = "collect")
+```
+
+We vatten de maandelijkse nitraatconcentratie verder samen tot 1 waarde per meetplaats per jaar.
+
+Als doelstelling hanteert VMM vanaf MAP 6 (2019-2022) de gemiddelde nitraatconcentratie per afstroomzone op basis van de wintergegevens:
+
+Lange termijn doelstelling per afstroomzone is een streefwaarde van 18 mg nitraat per liter.
+
+Daarnaast wordt een verbetering met 4 mg nitraat/l vooropgesteld voor de afstroomzones die in de periode 2015-2018 een gemiddelde nitraatconcentratie van meer dan 18 mg nitraat/l hadden.
+
+Zomerhalfjaar voor een bepaald jaar wordt gedefinieerd als metingen in maanden 4 (april) t.e.m. 9 (september) van dat jaar.
+Winterhalfjaar voor een bepaald jaar wordt gedefinieerd als de laatste maand van dat jaar (december) en de twee eerste maanden van het daaropvolgende jaar (januari en februari).
+
+Volgens deze definitie kunnen we winterhalfjaar nog niet berekenen omdat we enkel beschikken over de data van 2024.
+We benaderen deze winterhalfjaarwaarde door het gemiddelde te nemen van de maanden januari, februari en december van 2024.
+
+Alle gemeten waarden voor nitraatconcentratie liggen lager dan de drempelwaarde van `18 mg N/L`.
+
+```{r}
+#| label: nitraat-halfjaar
+
+chem_subset_nn <- chem_res |>
+  inner_join(meetplaatsen, by = join_by(sample_point)) |>
+  select(
+    sample_point,
+    bekken,
+    waterloop,
+    fgroup,
+    lambert_x, lambert_y,
+    sample_datum_monstername,
+    starts_with("parameter"), eenheid,
+    teken,
+    resultaat
+  ) |>
+  mutate(
+    jaar = lubridate::year(sample_datum_monstername),
+    maand = lubridate::month(sample_datum_monstername)
+  ) |>
+  select(-sample_datum_monstername) |>
+  complete(
+    nesting(
+      sample_point, bekken, waterloop, fgroup, lambert_x, lambert_y, jaar, maand
+    ),
+    nesting(
+      parameter_omschrijving, parameter_symbool, eenheid
+    )
+  ) |>
+  filter(parameter_omschrijving == "Nitraat")
+
+chem_jaar_nn <- chem_subset_nn |>
+  mutate(
+    periode = case_when(
+      maand %in% 1:2 ~ sprintf("Winterhalfjaar %s", jaar - 1),
+      maand == 12 ~ sprintf("Winterhalfjaar %s", jaar),
+      maand %in% 4:9 ~ sprintf("Zomerhalfjaar %s", jaar),
+      TRUE ~ NA
+    ),
+    periode_ = ifelse(
+      grepl("Winter", periode),
+      "Winterhalfjaar\n(benadering 1,2 en 12 2024)",
+      periode
+    )
+  ) |>
+  filter(!is.na(periode)) |>
+  group_by(
+    sample_point, fgroup, periode_, parameter_omschrijving, parameter_symbool,
+    eenheid
+  ) |>
+  summarise(
+    resultaat = exp(mean(log(resultaat), na.rm = TRUE)),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-nitraat-halfjaar
+#| fig-cap: "Nitraatconcentraties per halfjaar en gewastype"
+
+chem_jaar_nn |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = fgroup,
+      y = resultaat,
+      colour = periode_
+    ),
+    position = position_dodge(width = 0.5),
+    alpha = 0.3
+  ) +
+  facet_wrap(~ sprintf("%s [%s]", parameter_omschrijving, eenheid))
+```
+
+@fig-nitraat-aandeel-intensief toont dat in het winterhalfjaar de concentratie aan nitraat toeneemt met een hoger aandeel intensieve landbouw.
+
+```{r}
+#| label: fig-nitraat-aandeel-intensief
+#| fig-cap: "Geobserveerde relatie tussen aandeel intensieve landbouw en
+#|   nitraatconcentratie"
+#| fig-width: 10
+
+chem_jaar_nn |>
+  left_join(
+    watersheds |>
+      mutate(sample_point = paste0("OW", meetplaats)) |>
+      select(-fgroup),
+    by = join_by(sample_point)
+  ) |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = aandeel_intensief,
+      y = resultaat,
+      colour = fgroup
+    )
+  ) +
+  facet_grid(parameter_omschrijving ~ periode_) +
+  labs(y = "Concentratie")
+```
+
+## Biologische waterkwaliteit
+
+Biologische waterkwaliteit is hier een biotische index op basis van de verscheidenheid en abundantie aan macro-invertebraten die aangetroffen werden in de stalen.
+Deze stalen werden (in regel) één keer per locatie per jaar genomen.
+@tbl-mmif-beoordeling geeft aan dat in afstroomgebieden met dominantie van graanteelten het percentage dat Matig scoort het hoogst is.
+Voor afstroomgebieden met dominantie van maïsteelt, is dit percentage het hoogst voor beoordeling Goed.
+In beide types zijn er twee locaties waarvoor we niet over een beoordeling beschikken.
+Dit zijn locaties `r setdiff(meetplaatsen$sample_point, mmif$sample_point) |> xfun::join_words(and = " en ", oxford_comma = FALSE)`. 
+Er is ook één locatie met twee staalnamedata, we selecteren daarvan degene waar `bevesting_code` gelijk is aan `"R"`.
+
+```{r}
+#| label: filter-mmif
+
+mmif <- mmif |>
+  filter(bevestiging_code == "R")
+```
+
+```{r}
+#| label: tbl-mmif-beoordeling
+#| tbl-cap: "Aantal locaties per beoordelingsklasse en gewastype"
+
+mmif |>
+  full_join(meetplaatsen, by = join_by(sample_point, wl_code)) |>
+  rename(
+    beoordeling =
+      klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
+  ) |>
+  count(fgroup, beoordeling) |>
+  group_by(fgroup) |>
+  mutate(percentage = sprintf("%.0f%%", n / sum(n) * 100)) |>
+  kable(digits = 2)
+```
+
+@fig-mmif-index toont de biotische indexwaarde voor beide groepen evenals de gemiddelde waarde per groep met een 95% betrouwbaarheidsinterval.
+
+```{r}
+#| label: fig-mmif-index
+#| fig-cap: "Biotische index per gewastype met beoordelingsklasse"
+
+mmif_colours <- c(
+  Goed = "darkgreen",
+  Matig = "orange",
+  Ontoereikend = "darkred"
+)
+
+mmif |>
+  inner_join(meetplaatsen, by = join_by(sample_point, wl_code)) |>
+  rename(
+    beoordeling =
+      klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
+  ) |>
+  ggplot() +
+  stat_sum(
+    aes(
+      x = fgroup,
+      y = bio_index_waarde,
+      colour = beoordeling
+    )
+  ) +
+  scale_colour_manual(values = mmif_colours) +
+  labs(x = NULL, colour = "Beoordeling", size = "Aantal\nlocaties")
+```
+
+@fig-mmif-aandeel-intensief toont een zwak negatief verband tussen de biotische index en het aandeel intensieve landbouw.
+
+```{r}
+#| label: fig-mmif-aandeel-intensief
+#| fig-cap: "Geobserveerde relatie tussen aandeel intensieve landbouw en
+#|   biotische index"
+
+mmif |>
+  left_join(meetplaatsen) |>
+  left_join(
+    watersheds |>
+      mutate(sample_point = paste0("OW", meetplaats)) |>
+      select(-fgroup),
+    by = join_by(sample_point)
+  ) |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = aandeel_intensief,
+      y = bio_index_waarde,
+      colour = fgroup
+    )
+  ) +
+  labs(
+    x = "Aandeel intensieve landbouw",
+    y = "Biotische index",
+    colour = NULL
+  )
+```
+
+De staalname voor macro-invertebraten vond plaats tussen april en half oktober 2024.
+@fig-mmif-datum toont dat er geen effect is van het tijdstip van staalname op de biotische index.
+
+```{r}
+#| label: fig-mmif-datum
+#| fig-cap: "Geobserveerde relatie tussen datum van staalname en biotische
+#|  index"
+
+mmif |>
+  left_join(meetplaatsen) |>
+  ggplot() +
+  geom_point(
+    aes(
+      x = hoofd_sample_sample_datum_monstername,
+      y = bio_index_waarde,
+      colour = fgroup
+    )
+  ) +
+  labs(
+    x = "Datum monstername",
+    y = "Biotische index",
+    colour = NULL
+  )
+```
+
+# Modellering
+
+```{r}
+#| label: modeldata
+
+mmif_nn <- mmif |>
+  full_join(
+    chem_jaar_nn |>
+      filter(
+        grepl("Winter", periode_)
+      ),
+    by = join_by(sample_point)
+  ) |>
+  mutate(
+    jaar_mi = lubridate::year(hoofd_sample_sample_datum_monstername),
+    maand_mi = lubridate::month(hoofd_sample_sample_datum_monstername)
+  ) |>
+  rename(
+    mmif_label = klasse_bioind_beoordeling_beoordelingsklasse_label_rapportering
+  )
+
+mmif_nn <- mmif_nn |>
+  left_join(
+    watersheds |>
+      mutate(sample_point = paste0("OW", meetplaats)) |>
+      select(-fgroup),
+    by = join_by(sample_point)
+  )
+```
+
+De fysicochemische en biotische data (beide op jaarbasis) worden aan elkaar gekoppeld op basis van hun locatie identificatie.
+Zoals eerder aangegeven, zijn er vier locaties met ontbrekende waarden voor de biotische index.
+
+We fitten een model voor de effecten van het type afstroomgebied en het aandeel intensieve landbouw op enerzijds de biotische index (Beta verdeling en logistische link functie) en anderzijds de 'winterhalfjaar' nitraatconcentratie (Normale verdeling met afknotting van waarden onder nul).
+Het model waarbij biotische index de responsvariabele is, bevat eveneens een term om na te gaan of er een effect is van de nitraatconcentratie in elk type afstroomgebied.
+Nitraatconcentratie is hierdoor een moderatorvariabele (Engels mediator): 
+
+-   vergelijking 1: aandeel intensieve landbouw -> nitraatconcentratie
+-   vergelijking 2: nitraatconcentratie `+` aandeel intensieve landbouw -> biotische index
+
+waardoor we zowel een direct effect hebben van aandeel intensieve landbouw (via vergelijking 2) als een indirect effect (via vergelijking 1, gemodereerd door nitraat).
+
+Voor de biotische index vinden we geen significante directe of indirecte effecten (zie @tbl-params-mediation).
+Voor de nitraatconcentratie vinden we enkel een significant effect dat wijst op verhoogde winterhalfjaar nitraatconcentraties bij hoger aandeel intensieve landbouw (zie @tbl-params-mediation en @fig-ce-mmif-nitraat-aandeel-intensief) in afstroomgebieden met graanteelt dominantie.
+
+@fig-ce-mmif-nitraat-aandeel-intensief toont dat in afstroomgebieden met dominantie van graanteelt er ogenschijnlijk een omgekeerd verband is tussen de directe effecten van aandeel intensieve landbouw en nitraatconcentratie in het winterhalfjaar.
+Deze relaties zijn echter niet significant en het is twijfelachtig of beide relaties standhouden indien we over een grotere steekproef hadden beschikt in dit stratum.
+
+De uiteindelijke bedoeling is echter geen evaluatie van de toestand in een bepaald jaar, maar nagaan hoe - mits jaarlijkse opvolging van dezelfde locaties - de biotische en fysicochemische variabelen evolueren in functie van wijzigingen binnen de afstroomgebieden, zoals het voorzien van bufferstroken rond waterlopen.
+De nieuwe ecoregeling bufferstroken start in 2026.
+
+
+```{r}
+#| label: brms-model
+
+fs::dir_create(here::here("source", "brms_model"))
+fs::file_create(here::here("source", "brms_model", ".gitignore"))
+writeLines(
+  c("*", "!.gitignore"),
+  here::here("source", "brms_model", ".gitignore"),
+)
+m_mmif <- brm(
+  bf(
+    bio_index_waarde ~
+      aandeel_intensief +
+        fgroup +
+        resultaat +
+        aandeel_intensief:fgroup +
+        resultaat:fgroup,
+    family = "beta",
+    decomp = "QR"
+  ) +
+    bf(
+      resultaat | trunc(lb = 0) ~
+        aandeel_intensief +
+          fgroup +
+          aandeel_intensief:fgroup
+    ) +
+    set_rescor(FALSE),
+  data = mmif_nn,
+  family = gaussian(),
+  prior = prior(normal(0, 1), class = "b"),
+  cores = 4,
+  sample_prior = TRUE,
+  file = here::here("source", "brms_model", "m_mmif"),
+  file_refit = "on_change",
+  backend = "cmdstanr"
+)
+```
+
+
+```{r}
+#| eval: false
+m_mmif_2 <- brm(
+  bf(
+    bio_index_waarde ~
+      aandeel_landbouw +
+        fgroup +
+        log(resultaat) +
+        aandeel_landbouw:fgroup +
+        log(resultaat):fgroup,
+    family = "beta",
+    decomp = "QR"
+  ) +
+    bf(
+      log(resultaat) ~
+        aandeel_landbouw +
+          fgroup +
+          aandeel_landbouw:fgroup,
+        family = gaussian()
+    ) +
+    set_rescor(FALSE),
+  data = mmif_nn,
+  prior = prior(normal(0, 1), class = "b"),
+  cores = 4,
+  sample_prior = TRUE,
+  file = here::here("source", "brms_model", "m_mmif_2"),
+  file_refit = "on_change",
+  backend = "cmdstanr"
+)
+
+pdfun <- function(x, nsamp = 4000) {
+  pmax(sum(x > 0) / nsamp, sum(x < 0) / nsamp)
+}
+
+# 1. Define the coefficient names to make the formulas readable
+# Path a: aandeel -> resultaat (x -> m; treatment -> mediator)
+# identity link
+a_ref  <- "logresultaat_aandeel_landbouw"
+a_diff <- "logresultaat_aandeel_landbouw:fgroupMaïsdominant"
+
+# Path b: resultaat -> bio_index (m -> y; mediator -> outcome/response)
+# logit link
+b_ref <- "bioindexwaarde_logresultaat"
+b_diff <- "bioindexwaarde_fgroupMaïsdominant:logresultaat"
+
+# Path c' (Direct): aandeel -> bio_index (x -> y, treatment -> outcome/response)
+# logit link
+c_ref  <- "bioindexwaarde_aandeel_landbouw"
+c_diff <- "bioindexwaarde_aandeel_landbouw:fgroupMaïsdominant"
+
+# 2. Run the hypotheses
+# We calculate the Direct effects, Indirect effects (a*b) and Total effects
+# (c + a*b) # nolint
+med_tests <- hypothesis(
+  m_mmif_2,
+  c(
+    # --- Reference Group ---
+    "nitraat_direct_effect_aandeellandbouw_graan" = paste0(a_ref, " = 0"),
+    "mmif_direct_effect_aandeellandbouw_graan" = paste0(c_ref, " = 0"),
+    "mmif_direct_effect_nitraat_graan" = paste0(b_ref, " = 0"),
+    "mmif_indirect_effect_aandeellandbouw_graan" =
+      paste0(a_ref, " * ", b_ref, " = 0"),
+    "mmif_total_effect_aandeellandbouw_graan" = paste0(
+      c_ref, " + (", a_ref, " * ", b_ref, ") = 0"
+    ),
+
+    # --- Maïsdominant Group (must add interaction terms) ---
+    "nitraat_direct_effect_aandeellandbouw_mais" =
+      paste0("( ", a_ref, " + ", a_diff, ") = 0"),
+    "mmif_direct_effect_aandeellandbouw_mais" =
+      paste0(c_ref, " + ", c_diff, " = 0"),
+    "mmif_direct_effect_nitraat_mais" =
+      paste0(b_ref, " + ", b_diff, " = 0"),
+    "mmif_indirect_effect_aandeellandbouw_mais" =
+      paste0(
+        "(", a_ref, " + ", a_diff, ") * (", b_ref, " + ", b_diff, ") = 0"
+      ),
+    "mmif_total_effect_aandeellandbouw_mais" = paste0(
+      "(", c_ref, " + ", c_diff, ") + ((", a_ref, " + ", a_diff, ") * (",
+      b_ref, " + ", b_diff, ")) = 0"
+    )
+  ),
+  robust = FALSE
+)
+
+# 3. View results
+eoi <- med_tests$hypothesis |>
+  select(-Evid.Ratio, -Post.Prob, -Star) |>
+  bind_cols(
+    med_tests$samples |>
+      pivot_longer(
+        everything()
+      ) |>
+      group_by(
+        name
+      ) |>
+      summarise(
+        pd = pdfun(value),
+        pval = 2 * (1 - pd)
+      ) |>
+      mutate(
+        name = factor(name, levels = paste0("H", seq_len(n())))
+      ) |>
+      arrange(name) |>
+      select(-name)
+  ) |>
+  separate_wider_regex(
+    cols = Hypothesis,
+    patterns = c(
+      responsvariabele = ".*?",
+      "_",
+      type = ".*_effect",
+      "_",
+      effect = ".*?",
+      "_",
+      groep = ".*"
+    )
+  )
+eoi |>
+  kable(digits = 3)
+
+```
+
+
+
+```{r}
+#| label: tbl-params-mediation
+#| tbl-cap: "Directe, indirecte en totale effecten voor nitraatconcentratie en
+#|   biotische index. De schattingen zijn in de originele schaal voor
+#|   nitraatconcentratie en in de logit schaal voor de biotische index."
+
+pdfun <- function(x, nsamp = 4000) {
+  pmax(sum(x > 0) / nsamp, sum(x < 0) / nsamp)
+}
+
+# 1. Define the coefficient names to make the formulas readable
+# Path a: aandeel -> resultaat (x -> m; treatment -> mediator)
+# identity link
+a_ref  <- "resultaat_aandeel_intensief"
+a_diff <- "resultaat_aandeel_intensief:fgroupMaïsdominant"
+
+# Path b: resultaat -> bio_index (m -> y; mediator -> outcome/response)
+# logit link
+b_ref <- "bioindexwaarde_resultaat"
+b_diff <- "bioindexwaarde_fgroupMaïsdominant:resultaat"
+
+# Path c' (Direct): aandeel -> bio_index (x -> y, treatment -> outcome/response)
+# logit link
+c_ref  <- "bioindexwaarde_aandeel_intensief"
+c_diff <- "bioindexwaarde_aandeel_intensief:fgroupMaïsdominant"
+
+# 2. Run the hypotheses
+# We calculate the Direct effects, Indirect effects (a*b) and Total effects
+# (c + a*b) # nolint
+med_tests <- hypothesis(
+  m_mmif,
+  c(
+    # --- Reference Group ---
+    "nitraat_direct_effect_aandeelintensief_graan" = paste0(a_ref, " = 0"),
+    "mmif_direct_effect_aandeelintensief_graan" = paste0(c_ref, " = 0"),
+    "mmif_direct_effect_nitraat_graan" = paste0(b_ref, " = 0"),
+    "mmif_indirect_effect_aandeelintensief_graan" =
+      paste0(a_ref, " * ", b_ref, " = 0"),
+    "mmif_total_effect_aandeelintensief_graan" = paste0(
+      c_ref, " + (", a_ref, " * ", b_ref, ") = 0"
+    ),
+
+    # --- Maïsdominant Group (must add interaction terms) ---
+    "nitraat_direct_effect_aandeelintensief_mais" =
+      paste0("( ", a_ref, " + ", a_diff, ") = 0"),
+    "mmif_direct_effect_aandeelintensief_mais" =
+      paste0(c_ref, " + ", c_diff, " = 0"),
+    "mmif_direct_effect_nitraat_mais" =
+      paste0(b_ref, " + ", b_diff, " = 0"),
+    "mmif_indirect_effect_aandeelintensief_mais" =
+      paste0(
+        "(", a_ref, " + ", a_diff, ") * (", b_ref, " + ", b_diff, ") = 0"
+      ),
+    "mmif_total_effect_aandeelintensief_mais" = paste0(
+      "(", c_ref, " + ", c_diff, ") + ((", a_ref, " + ", a_diff, ") * (",
+      b_ref, " + ", b_diff, ")) = 0"
+    )
+  ),
+  robust = FALSE
+)
+
+# 3. View results
+eoi <- med_tests$hypothesis |>
+  select(-Evid.Ratio, -Post.Prob, -Star) |>
+  bind_cols(
+    med_tests$samples |>
+      pivot_longer(
+        everything()
+      ) |>
+      group_by(
+        name
+      ) |>
+      summarise(
+        pd = pdfun(value),
+        pval = 2 * (1 - pd)
+      ) |>
+      mutate(
+        name = factor(name, levels = paste0("H", seq_len(n())))
+      ) |>
+      arrange(name) |>
+      select(-name)
+  ) |>
+  separate_wider_regex(
+    cols = Hypothesis,
+    patterns = c(
+      responsvariabele = ".*?",
+      "_",
+      type = ".*_effect",
+      "_",
+      effect = ".*?",
+      "_",
+      groep = ".*"
+    )
+  )
+eoi |>
+  kable(digits = 3)
+```
+
+
+```{r}
+#| eval: FALSE
+# compare with mediation(), only returns the effects for "graan"
+bayestestR::mediation(m_mmif, centrality = "mean")
+```
+
+
+```{r}
+#| label: fig-ce-mmif-nitraat-aandeel-intensief
+#| fig-cap: "Conditionele directe effecten van aandeel intensieve landbouw en
+#|  nitraatconcentratie op biotische index en van aandeel intensieve landbouw op
+#|  nitraatconcentratie."
+#| fig-width: 10
+
+p <- conditional_effects(
+  m_mmif,
+  "aandeel_intensief:fgroup",
+  resp = "bioindexwaarde"
+) |> plot(
+  points = TRUE,
+  theme = theme_inbo(),
+  plot = FALSE
+)
+p <- p[[1]] +
+  scale_color_discrete() +
+  scale_fill_discrete() +
+  labs(
+    colour = NULL, fill = NULL,
+    x = "Aandeel intensieve landbouw",
+    y = "Biotische index"
+  )
+
+q <- conditional_effects(
+  m_mmif,
+  "resultaat:fgroup",
+  resp = "bioindexwaarde"
+) |> plot(
+  points = TRUE,
+  theme = theme_inbo(),
+  plot = FALSE
+)
+
+q <- q[[1]] +
+  scale_color_discrete() +
+  scale_fill_discrete() +
+  labs(
+    colour = NULL, fill = NULL,
+    x = "Nitraatconcentratie (winterhalfjaar)",
+    y = "Biotische index"
+  )
+
+
+r <- conditional_effects(
+  m_mmif,
+  "aandeel_intensief:fgroup",
+  resp = "resultaat"
+) |> plot(
+  points = TRUE,
+  theme = theme_inbo(),
+  plot = FALSE
+)
+
+r <- r[[1]] +
+  scale_color_discrete() +
+  scale_fill_discrete() +
+  labs(
+    colour = NULL, fill = NULL,
+    x = "Aandeel intensieve landbouw",
+    y = "Nitraat [mg N/L]"
+  )
+
+(p + q) / (r + plot_spacer()) +
+  plot_layout(guides = "collect", axes = "collect")
+```
+
+# Conclusies
+
+-   De onderzochte meetplaatsen vertegenwoordigen middelgrote afstroomgebieden met een hoog aandeel landbouw. Vijftien meetplaatsen hebben een afstroomgebied waar graanteelten dominant zijn en 25 van de onderzochte meetplaatsen hebben een afstroomgebied waar maïsteelt dominant is. De eerste is wellicht op zwaardere klei- en leembodems en de tweede wellicht op lichtere zand- en zandleembodems.
+-   In 2024 werden de locaties onderzocht op fysicochemische en biotische waterkwaliteit. Voor 4 locaties ontbraken gegevens over de biotische waterkwaliteit. De fysicochemische data voor nitraat werden verder samengevat tot één waarde per (periode in een) jaar per meetlocatie.
+-   De biotische index wordt op de meeste locaties beoordeeld als matig tot goed.
+-   Een eerste modellering toonde aan dat een hoger oppervlakte-aandeel intensieve landbouw de winterhalfjaar concentratie aan nitraat doet stijgen. De gemeten concentraties liggen lager dan de drempelwaarde van `18 mg N/L`.
+-   We vinden in deze beperkte dataset geen aantoonbaar negatief effect van deze eutrofiëring op de biotische kwaliteit gereflecteerd door de macro-invertebraten gemeenschap, noch indirect van het aandeel intensieve landbouw in het afstroomgebied.
+-   Deze monitoring voor het jaar 2024 zou jaarlijks herhaald moeten worden om op termijn effecten te kunnen aantonen van beschermende maatregelen zoals bufferstroken langs waterlopen. Dit zal steeds moeten gepaard gaan met een analyse waarbij rekening wordt gehouden met andere belangrijke factoren die _a priori_ niet kunnen gecontroleerd worden. Er kan ook overwogen worden om het aantal meetplaatsen voor afstroomgebieden met dominantie van graanteelten te verhogen met een tiental extra meetplaatsen.
+
+

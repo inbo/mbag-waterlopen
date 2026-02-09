@@ -1,0 +1,43 @@
+{
+  "license": "CC BY 4.0",
+  "access_right": "open",
+  "title": "Monitoring Biodiversiteit in het Agrarisch Gebied - module monitoring van macro-invertebraten in waterlopen",
+  "description": "<p>Deze module maakt deel uit van het Meetnet Biodiversiteit Agrarisch Gebied (MBAG). INBO zal in samenwerking met VMM een set van meetpunten langs waterlopen opvolgen. We meten hiervoor de biotische kwaliteit via macro-invertebraten en linken dit aan metingen van de waterkwaliteit en kenmerken van het afstroomgebied. De meetpunten zijn geselecteerd om middelgrote afstroomgebieden te vertegenwoordigen die gekenmerkt worden door ofwel landbouw op lichte gronden met dominantie van maïsteelt ofwel landbouw op zwaardere gronden met dominantie van graanteelt.<\/p>",
+  "keywords": [
+    "MBAG",
+    "macroinvertebraten",
+    "MMIF",
+    "afstroomgebieden",
+    "landbouw"
+  ],
+  "upload_type": "software",
+  "language": "nld",
+  "contributors": [
+    {
+      "name": "Van Calster, Hans",
+      "affiliation": "Instituut voor Natuur- en Bosonderzoek (INBO)",
+      "orcid": "0000-0001-8595-8426",
+      "type": "contactperson"
+    },
+    {
+      "name": "Research Institute for Nature and Forest (INBO)",
+      "type": "rightsholder"
+    },
+    {
+      "name": "Flanders Environment Agency (VMM)",
+      "type": "rightsholder"
+    }
+  ],
+  "creators": [
+    {
+      "name": "Van Calster, Hans",
+      "affiliation": "Instituut voor Natuur- en Bosonderzoek (INBO)",
+      "orcid": "0000-0001-8595-8426"
+    }
+  ],
+  "communities": [
+    {
+      "identifier": "inbo"
+    }
+  ]
+}

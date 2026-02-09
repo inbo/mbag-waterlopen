@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using these metadata.
+title: "Monitoring Biodiversiteit in het Agrarisch Gebied - module monitoring van
+  macro-invertebraten in waterlopen"
+authors:
+- given-names: Hans
+  family-names: Van Calster
+  affiliation: Instituut voor Natuur- en Bosonderzoek (INBO)
+  orcid: 0000-0001-8595-8426
+keywords:
+- MBAG
+- macroinvertebraten
+- MMIF
+- afstroomgebieden
+- landbouw
+contact:
+- given-names: Hans
+  family-names: Van Calster
+  affiliation: Instituut voor Natuur- en Bosonderzoek (INBO)
+  orcid: 0000-0001-8595-8426
+doi: ~
+license: CC BY 4.0
+repository-code: https://github.com/inbo/mbag-waterlopen/
+type: software
+abstract: "Deze module maakt deel uit van het Meetnet Biodiversiteit Agrarisch Gebied
+  (MBAG). INBO zal in samenwerking met VMM een set van meetpunten langs waterlopen
+  opvolgen. We meten hiervoor de biotische kwaliteit via macro-invertebraten en linken
+  dit aan metingen van de waterkwaliteit en kenmerken van het afstroomgebied. De meetpunten
+  zijn geselecteerd om middelgrote afstroomgebieden te vertegenwoordigen die gekenmerkt
+  worden door ofwel landbouw op lichte gronden met dominantie van maïsteelt ofwel
+  landbouw op zwaardere gronden met dominantie van graanteelt."
