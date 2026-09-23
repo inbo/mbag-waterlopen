@@ -1,13 +1,15 @@
 <!-- badges: start -->
+![Language: nl-BE](https://img.shields.io/badge/language-nl--BE-c04384)
 [![Project Status: Concept - Minimal or no implementation has been done yet, or the repository is only intended to be a limited example, demo, or proof-of-concept.](https://www.repostatus.org/badges/latest/concept.svg)](https://www.repostatus.org/#concept)
+![version: 0.1.0](https://img.shields.io/badge/version-0.1.0-c04384)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
-[![CC BY 4.0](https://img.shields.io/badge/License-CC_BY_4.0-brightgreen)](https://raw.githubusercontent.com/inbo/checklist/refs/heads/main/inst/generic_template/cc_by_4_0.md)
+[![CC BY 4.0](https://img.shields.io/badge/License-CC_BY_4.0-brightgreen)](https://raw.githubusercontent.com/inbo/citeme/refs/heads/main/inst/licenses/cc_by_4_0.md)
 <!-- badges: end -->
 
 # Monitoring Biodiversiteit in het Agrarisch Gebied - module monitoring van macro-invertebraten in waterlopen
 
 [Van Calster, Hans![ORCID logo](https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png)](https://orcid.org/0000-0001-8595-8426)[^aut][^cre][^INBO];
-[Instituut voor Natuur- en Bosonderzoek (INBO)](mailto:info%40inbo.be)[^cph][^fnd];
+[Instituut voor Natuur- en Bosonderzoek (INBO)](mailto:info%40inbo.be)[^cph][^fnd][^pbl];
 [Vlaamse Milieumaatschappij (VMM)](mailto:info%40vmm.be)[^cph][^fnd]
 
 [^aut]: author
@@ -15,6 +17,7 @@
 [^cre]: contact person
 [^fnd]: funder
 [^INBO]: Instituut voor Natuur- en Bosonderzoek (INBO)
+[^pbl]: publisher
 
 **keywords**:  MBAG; macroinvertebraten; MMIF; afstroomgebieden; landbouw
 
