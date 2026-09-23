@@ -19,7 +19,7 @@ contact:
   affiliation: Instituut voor Natuur- en Bosonderzoek (INBO)
   orcid: 0000-0001-8595-8426
 doi: ~
-license: CC BY 4.0
+license: CC-BY-4.0
 repository-code: https://github.com/inbo/mbag-waterlopen/
 type: software
 abstract: "Deze module maakt deel uit van het Meetnet Biodiversiteit Agrarisch Gebied
@@ -29,3 +29,4 @@ abstract: "Deze module maakt deel uit van het Meetnet Biodiversiteit Agrarisch G
   zijn geselecteerd om middelgrote afstroomgebieden te vertegenwoordigen die gekenmerkt
   worden door ofwel landbouw op lichte gronden met dominantie van maïsteelt ofwel
   landbouw op zwaardere gronden met dominantie van graanteelt."
+version: 0.1.0
