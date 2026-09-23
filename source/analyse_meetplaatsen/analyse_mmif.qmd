@@ -445,7 +445,7 @@ watersheds |>
   ) |>
   mutate(
     meetplaats = reorder(meetplaats, aandeel)
-  ) |> 
+  ) |>
   ggplot() +
   geom_col(
     aes(
@@ -461,7 +461,6 @@ watersheds |>
   ) +
   facet_grid(rows = vars(fgroup), scales = "free_y") +
   theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-  
 ```
 
 
