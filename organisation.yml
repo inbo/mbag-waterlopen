@@ -12,9 +12,9 @@ info@inbo.be:
   ror: 00j54wy13
   orcid: yes
   zenodo: inbo
-  rightsholder: when no other
+  rightsholder: shared
   funder: when no other
-  publisher: optional
+  publisher: when no other
   license:
     package:
       GPL-3: https://raw.githubusercontent.com/inbo/citeme/refs/heads/main/inst/licenses/gplv3.md
@@ -35,9 +35,5 @@ info@vmm.be:
   publisher: optional
   license:
     package:
-      GPL-3: https://raw.githubusercontent.com/inbo/citeme/refs/heads/main/inst/licenses/gplv3.md
-      MIT: https://raw.githubusercontent.com/inbo/citeme/refs/heads/main/inst/licenses/mit.md
     project:
-      CC BY 4.0: https://raw.githubusercontent.com/inbo/citeme/refs/heads/main/inst/licenses/cc_by_4_0.md
     data:
-      CC0: https://raw.githubusercontent.com/inbo/citeme/refs/heads/main/inst/licenses/cc0.md

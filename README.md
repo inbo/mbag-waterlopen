@@ -9,7 +9,7 @@
 
 [Van Calster, Hans![ORCID logo](https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png)](https://orcid.org/0000-0001-8595-8426)[^aut][^cre][^INBO];
 [Instituut voor Natuur- en Bosonderzoek (INBO)](mailto:info%40inbo.be)[^cph][^fnd][^pbl];
-[Vlaamse Milieumaatschappij (VMM)](mailto:info%40vmm.be)[^cph][^fnd]
+[Vlaamse Milieumaatschappij (VMM)](mailto:info%40vmm.be)[^fnd]
 
 [^aut]: author
 [^cph]: copyright holder
