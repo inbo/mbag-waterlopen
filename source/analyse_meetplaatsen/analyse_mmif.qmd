@@ -913,7 +913,7 @@ m_mmif_2 <- brm(
         aandeel_landbouw +
           fgroup +
           aandeel_landbouw:fgroup,
-        family = gaussian()
+      family = gaussian()
     ) +
     set_rescor(FALSE),
   data = mmif_nn,
