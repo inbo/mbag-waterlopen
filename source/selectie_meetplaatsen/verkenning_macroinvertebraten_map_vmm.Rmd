@@ -660,10 +660,50 @@ dt <- dtm_hydro %>%
 streams_crop <- streams_sf %>%
   st_crop(ws %>% st_buffer(dist = 200))
 
+mapviewOptions(
+  basemaps =
+    c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoothDark","OpenStreetMap",
+      "Esri.WorldImagery", "OpenTopoMap")
+  )
+
 mapview(locs, zcol = "meetplaats") +
   mapview(ws, zcol = "meetplaats", alpha.regions = 0) +
   mapview(dt) +
   mapview(streams_crop)
+```
+
+
+```{r eval=FALSE}
+rownr <- 8
+locs <- locations %>% slice(rownr)
+ws <- watersheds %>%
+  inner_join(locs |> st_drop_geometry())
+
+my_palette <- cm.colors(9)
+dt <- dtm_hydro %>%
+  crop(
+    vect(
+      ws %>%
+        st_buffer(dist = 200)
+    ),
+    mask = TRUE
+  ) %>%
+  raster::raster()
+
+streams_crop <- streams_sf %>%
+  st_crop(ws %>% st_buffer(dist = 200))
+
+mapviewOptions(
+  basemaps =
+    c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoothDark","OpenStreetMap",
+      "Esri.WorldImagery", "OpenTopoMap")
+  )
+
+mapview(dt) +
+  mapview(locs) +
+  mapview(ws, alpha.regions = 0) +
+  mapview(streams_crop)
+
 ```
 
 Visualisatie van alle afstroomgebieden:
@@ -788,6 +828,66 @@ ws_aandeel_lb_intensief <- watersheds_gewasgroep_2022 %>%
     area_ha = sum(area_m2) / 1e4
   )
 ```
+
+```{r eval=FALSE}
+rownr <- 8
+locs <- locations %>% slice(rownr)
+ws <- watersheds %>%
+  inner_join(locs |> st_drop_geometry())
+
+my_palette <- cm.colors(9)
+dt <- dtm_hydro %>%
+  crop(
+    vect(
+      ws %>%
+        st_buffer(dist = 200)
+    ),
+    mask = TRUE
+  ) %>%
+  raster::raster()
+
+streams_crop <- streams_sf %>%
+  st_crop(ws %>% st_buffer(dist = 200))
+
+mapviewOptions(
+  basemaps =
+    c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoothDark","OpenStreetMap",
+      "Esri.WorldImagery", "OpenTopoMap")
+  )
+
+mapview(dt) +
+  mapview(locs) +
+  mapview(ws, alpha.regions = 0) +
+  mapview(streams_crop)
+
+
+
+lbg_cropped <- lbg2022 |>
+  collect() |>
+  mutate(geometry = st_as_sfc(geometry)) |>
+  st_as_sf(crs = 31370) |>
+  st_intersection(ws) |>
+  mutate(
+    landgebruik = case_when(
+      GEWASGROEP %in% c(
+        "Aardappelen",
+        "Maïs",
+        "Groenten, kruiden en sierplanten",
+        "Voedergewassen"
+      ) ~ "intensieve akkerbouw",
+      GEWASGROEP == "Grasland" ~ "grasland",
+      TRUE ~ "overige landbouw"
+    )
+  )
+
+mapview(ws, alpha.regions = 0) +
+  mapview(locs) +
+  mapview(streams_crop) +
+  mapview(lbg_cropped, zcol = "landgebruik")
+
+
+```
+
 
 Oppervlakte-aandeel van alle gewasgroepen = oppervlakte-aandeel landbouw.
 
