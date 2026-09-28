@@ -5,8 +5,6 @@ allowed:
   notes:
   - motivation: nog niet nodig
     value: no DOI badge found in README.md
-  - motivation: nog niet nodig
-    value: No version information found in README.md
   - motivation: geen website
     value: no website badge found in README.md
 required:
@@ -23,3 +21,5 @@ spelling:
   - LICENSE.md
   - source/R/geocomputations.R
   - README.md
+pak: []
+gha_install: []
