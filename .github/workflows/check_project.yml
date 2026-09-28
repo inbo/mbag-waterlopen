@@ -7,11 +7,20 @@ name: check-project
 
 jobs:
   check-src:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "check project with checklist"
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RSPM: "https://packagemanager.posit.co/cran/__linux__/noble/latest"
+
     permissions:
       contents: read
+
     steps:
-      - uses: inbo/actions/check_project@devel
+      - name: "Check project with checklist"
+        uses: inbo/actions/check_project@devel
+        with:
+          path: "."
+          run: |
+            sudo apt-get update
+            sudo apt-get install -y libudunits2-dev
