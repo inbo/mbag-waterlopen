@@ -662,9 +662,9 @@ streams_crop <- streams_sf %>%
 
 mapviewOptions(
   basemaps =
-    c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoothDark","OpenStreetMap",
+    c("Esri.WorldGrayCanvas", "Stadia.AlidadeSmoothDark", "OpenStreetMap",
       "Esri.WorldImagery", "OpenTopoMap")
-  )
+)
 
 mapview(locs, zcol = "meetplaats") +
   mapview(ws, zcol = "meetplaats", alpha.regions = 0) +
@@ -695,9 +695,9 @@ streams_crop <- streams_sf %>%
 
 mapviewOptions(
   basemaps =
-    c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoothDark","OpenStreetMap",
+    c("Esri.WorldGrayCanvas", "Stadia.AlidadeSmoothDark", "OpenStreetMap",
       "Esri.WorldImagery", "OpenTopoMap")
-  )
+)
 
 mapview(dt) +
   mapview(locs) +
@@ -851,9 +851,9 @@ streams_crop <- streams_sf %>%
 
 mapviewOptions(
   basemaps =
-    c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoothDark","OpenStreetMap",
+    c("Esri.WorldGrayCanvas", "Stadia.AlidadeSmoothDark", "OpenStreetMap",
       "Esri.WorldImagery", "OpenTopoMap")
-  )
+)
 
 mapview(dt) +
   mapview(locs) +
