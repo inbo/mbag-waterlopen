@@ -647,6 +647,8 @@ mapview(locs, zcol = "meetplaats") +
 ```
 
 
+
+
 ```{r}
 dt <- dtm_hydro %>%
   crop(
@@ -718,6 +720,51 @@ mapview(vha_bekkens, alpha.regions = 0, legend = FALSE) +
   mapview(locs_orig, legend = FALSE) +
   mapview(watersheds, zcol = "meetplaats", legend = FALSE) +
   mapview(streams_sf, alpha = 0.3, hide = TRUE)
+```
+
+
+```{r fig-alle-bekkens, eval=FALSE}
+wsvha <- watersheds |>
+  st_join(vha_bekkens) |>
+  semi_join(
+    mmif_beste_reeksen %>%
+      st_drop_geometry()
+  )
+
+locsvha <- locations |>
+  st_join(vha_bekkens) |>
+  semi_join(
+    mmif_beste_reeksen %>%
+      st_drop_geometry()
+  )
+
+library(basemaps) # Modern tile fetching interface
+wsvha <- st_transform(wsvha, crs = 3857)
+locsvha <- st_transform(locsvha, crs = 3857)
+# 1. Set your preferred basemap style globally
+set_defaults(map_service = "esri", map_type = "world_light_gray_base")
+
+# 2. Plot directly using basemap_ggplot
+wsvha$STRMGEB <- as.factor(wsvha$STRMGEB)
+locsvha$STRMGEB <- as.factor(locsvha$STRMGEB)
+library(ggnewscale)
+library(RColorBrewer)
+
+lev <- levels(wsvha$STRMGEB)
+pal <- setNames(brewer.pal(max(3, length(lev)), "Set2")[seq_along(lev)], lev)
+# or a muted alternative: viridisLite::viridis(length(lev), end = 0.9)
+
+ggplot() +
+  basemap_gglayer(wsvha) +
+  scale_fill_identity() +          # the basemap's own scale
+  new_scale_fill() +               # start a fresh fill scale for the polygons
+  geom_sf(data = wsvha, aes(fill = STRMGEB), alpha = 0.45, color = NA) +
+  scale_fill_manual(values = pal) +
+  geom_sf(data = locsvha, aes(color = STRMGEB),
+          show.legend = FALSE, size = 1.2) +
+  scale_color_manual(values = pal) +
+  coord_sf(crs = 3857) +           # keep everything in the basemap's CRS
+  theme_minimal() 
 ```
 
 Enkel de afstroomgebieden van de meetplaatsen waar er recente (>= 2018) MMIF metingen van zijn:
@@ -888,7 +935,6 @@ mapview(ws, alpha.regions = 0) +
 
 ```
 
-
 Oppervlakte-aandeel van alle gewasgroepen = oppervlakte-aandeel landbouw.
 
 Als benadering van intensieve landbouw, heb ik ook oppervlakte-aandeel van gewasgroepen "Aardappelen", "Maïs", "Groenten, kruiden en sierplanten" en "Voedergewassen" (eerder stikstof-eisende gewassen / gewassen die sterker bemest worden).
@@ -1019,6 +1065,28 @@ watersheds_selectie <- watersheds %>%
 ```{r}
 mapview(watersheds_selectie, zcol = "aandeel_landbouw")
 ```
+
+
+```{r fig-watersheds-selectie, eval=FALSE}
+library(basemaps) # Modern tile fetching interface
+wssel <- st_transform(watersheds_selectie, crs = 3857)
+# 1. Set your preferred basemap style globally
+set_defaults(map_service = "esri", map_type = "world_light_gray_base")
+
+library(ggnewscale)
+library(RColorBrewer)
+
+ggplot() +
+  basemap_gglayer(wssel) +
+  scale_fill_identity() +          # the basemap's own scale
+  new_scale_fill() +               # start a fresh fill scale for the polygons
+  geom_sf(data = wssel, aes(fill = opp_ha), alpha = 0.45, color = NA) +
+  coord_sf(crs = 3857) +           # keep everything in the basemap's CRS
+  theme_minimal() 
+
+
+```
+
 
 Voor deze eerste selectie van meetplaatsen berekenen we vervolgens een clustering op basis van gelijkaardige gewasgroepensamenstelling.
 Hiervoor hebben we enkel de oppervlakte-aandelen van de belangrijkste gewasgroepen gebruikt (combinatie van voldoende oppervlakte-aandeel en potentieel effect op nitraat en MMIF): Grasland, Granen, zaden en peulvruchten, Suikerbieten, Maïs, Voedergewassen, Aardappelen.
@@ -1217,6 +1285,30 @@ mapview(vha_bekkens, alpha.regions = 0, legend = FALSE) +
   )
 ```
 
+```{r fig-watersheds-selectie-clusters, eval=FALSE}
+library(basemaps) # Modern tile fetching interface
+wssel <- st_transform(watersheds_selectie, crs = 3857)
+# 1. Set your preferred basemap style globally
+set_defaults(map_service = "esri", map_type = "world_light_gray_base")
+
+library(ggnewscale)
+library(RColorBrewer)
+
+wssel <- wssel |>
+  rename(cluster = fgroup)
+
+ggplot() +
+  basemap_gglayer(wssel) +
+  scale_fill_identity() +          # the basemap's own scale
+  new_scale_fill() +               # start a fresh fill scale for the polygons
+  geom_sf(data = wssel, aes(fill = cluster), alpha = 0.45, color = NA) +
+  coord_sf(crs = 3857) +           # keep everything in the basemap's CRS
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+
 De volgende twee figuren tonen de evoluties in MMIF en nitraat voor deze selectie van meetplaatsen opgesplitst volgens de clustering:
 
 ```{r}
@@ -1229,7 +1321,7 @@ mi_fc %>%
   ggplot() +
   geom_line(aes(x = jaar, y = mmif, group = meetplaats)) +
   geom_smooth(aes(x = jaar, y = mmif), method = "lm") +
-  facet_wrap(~group, ncol = 2)
+  facet_wrap(~fgroup, ncol = 2)
 
 mi_fc %>%
   inner_join(
@@ -1245,7 +1337,7 @@ mi_fc %>%
     )
   ) +
   scale_y_log10() +
-  facet_wrap(~group, ncol = 2)
+  facet_wrap(~fgroup, ncol = 2)
 ```
 
 In groepen 1 (Grasland dominant en laag aandeel landbouw) en 4 (Maïs dominant) zijn de meeste "historische" gegevens beschikbaar voor MMIF en nitraat.
