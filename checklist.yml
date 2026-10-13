@@ -2,12 +2,14 @@ description: Configuration file for checklist::check_pkg()
 package: no
 allowed:
   warnings: []
-  notes: []
+  notes:
+  - motivation: nog niet nodig
+    value: no DOI badge found in README.md
+  - motivation: geen website
+    value: no website badge found in README.md
 required:
 - CITATION
 - checklist
-- filename conventions
-- folder conventions
 - license
 - lintr
 - organisation
@@ -19,3 +21,5 @@ spelling:
   - LICENSE.md
   - source/R/geocomputations.R
   - README.md
+pak: []
+gha_install: []
